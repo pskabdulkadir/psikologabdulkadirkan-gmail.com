@@ -1,5 +1,4 @@
 import { AssetSymbol, ExchangeConfig, ExchangeMarketData, ArbitrageOpportunity, OrderLog, NetworkConnectionLog, ExchangeBalances } from '../types';
-import ccxt from 'ccxt';
 
 // Supported CEX exchanges - REAL PRODUCTION ONLY
 export const EXCHANGES: ExchangeConfig[] = [
@@ -275,57 +274,18 @@ export function createNetworkLog(
   };
 }
 
-// REAL LIVE CCXT TRADING - ONLY IF API KEYS PROVIDED
+// NOTE: Live balance fetching and order placement require backend API proxy
+// (CCXT runs on Node.js, not browser). Browser-side can only:
+// 1. Display public market data (Binance public API)
+// 2. Store API keys in localStorage
+// 3. Send requests to backend for actual trading
+
+// Placeholder for future backend integration
 export async function fetchLiveBalances(exchangeId: string): Promise<ExchangeBalances | null> {
-  const keys = RuntimeAuthService.getKeys(exchangeId);
-  
-  if (!keys.apiKey || !keys.apiSecret) {
-    console.warn(`No API keys configured for ${exchangeId}`);
-    return null;
-  }
-
-  try {
-    let exchange: any;
-    
-    if (exchangeId === 'binance') {
-      exchange = new ccxt.binance({
-        apiKey: keys.apiKey,
-        secret: keys.apiSecret,
-        enableRateLimit: true
-      });
-    } else if (exchangeId === 'okx') {
-      exchange = new ccxt.okx({
-        apiKey: keys.apiKey,
-        secret: keys.apiSecret,
-        password: keys.passphrase || '',
-        enableRateLimit: true
-      });
-    } else if (exchangeId === 'coinbase') {
-      exchange = new ccxt.coinbase({
-        apiKey: keys.apiKey,
-        secret: keys.apiSecret,
-        enableRateLimit: true
-      });
-    }
-
-    if (!exchange) return null;
-
-    const balance = await exchange.fetch_balance();
-    return {
-      USDT: balance['USDT']?.free || 0,
-      BTC: balance['BTC']?.free || 0,
-      ETH: balance['ETH']?.free || 0,
-      SOL: balance['SOL']?.free || 0,
-      AVAX: balance['AVAX']?.free || 0,
-      LINK: balance['LINK']?.free || 0
-    };
-  } catch (error) {
-    console.error(`Failed to fetch balance from ${exchangeId}:`, error);
-    return null;
-  }
+  console.warn(`Live balance fetching requires backend CCXT proxy for ${exchangeId}`);
+  return null;
 }
 
-// REAL LIVE ORDER PLACEMENT - ONLY IF API KEYS PROVIDED
 export async function placeLiveOrder(
   exchangeId: string,
   symbol: string,
@@ -333,58 +293,8 @@ export async function placeLiveOrder(
   amount: number,
   price?: number
 ): Promise<OrderLog | null> {
-  const keys = RuntimeAuthService.getKeys(exchangeId);
-  
-  if (!keys.apiKey || !keys.apiSecret) {
-    console.error(`No API keys for ${exchangeId} - cannot place order`);
-    return null;
-  }
-
-  try {
-    let exchange: any;
-    
-    if (exchangeId === 'binance') {
-      exchange = new ccxt.binance({
-        apiKey: keys.apiKey,
-        secret: keys.apiSecret,
-        enableRateLimit: true
-      });
-    } else if (exchangeId === 'okx') {
-      exchange = new ccxt.okx({
-        apiKey: keys.apiKey,
-        secret: keys.apiSecret,
-        password: keys.passphrase || '',
-        enableRateLimit: true
-      });
-    } else if (exchangeId === 'coinbase') {
-      exchange = new ccxt.coinbase({
-        apiKey: keys.apiKey,
-        secret: keys.apiSecret,
-        enableRateLimit: true
-      });
-    }
-
-    if (!exchange) return null;
-
-    const order = price 
-      ? await exchange.create_limit_order(symbol, orderType, amount, price)
-      : await exchange.create_market_order(symbol, orderType, amount);
-
-    return {
-      id: order.id,
-      timestamp: Date.now(),
-      exchange: exchangeId,
-      asset: symbol.split('/')[0],
-      orderType,
-      amount,
-      price: order.average || price || 0,
-      status: 'COMPLETED',
-      txHash: generateLocalHash(order.id)
-    };
-  } catch (error) {
-    console.error(`Order placement failed on ${exchangeId}:`, error);
-    return null;
-  }
+  console.warn(`Live order placement requires backend CCXT proxy for ${exchangeId}`);
+  return null;
 }
 
 // ANALYTICS ENGINE - REAL DATA ONLY
