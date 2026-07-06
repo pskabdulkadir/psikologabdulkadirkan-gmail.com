@@ -222,6 +222,14 @@ export default function App() {
     }
   };
 
+  // Clear all localStorage test data
+  const handleClearAllData = () => {
+    if (confirm('TÜM TEST VERİLERİNİ SİL? (localStorage temizlenecek)')) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
   // Sync UI key updates dynamically to RuntimeAuthService (RAM only)
   useEffect(() => {
     if (engineConfig.apiKeys) {
@@ -1683,6 +1691,13 @@ export default function App() {
                       <p className="text-[10px] text-gray-500">
                         ⚠️ Anahtarlar sadece tarayıcı RAM belleğinde (localStorage) saklı kalır. Sunucu tarafına gönderilmez.
                       </p>
+
+                      <button
+                        onClick={handleClearAllData}
+                        className="w-full bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-500/30 text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
+                      >
+                        ⚠️ TÜM TEST VERİLERİNİ SİL (localStorage)
+                      </button>
                     </div>
                   )}
                 </div>
