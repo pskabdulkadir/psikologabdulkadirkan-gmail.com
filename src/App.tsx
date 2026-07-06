@@ -65,7 +65,7 @@ export default function App() {
 
   // Simulator Data States
   const [marketPrices, setMarketPrices] = useState<Record<string, ExchangeMarketData>>(
-    generateMarketPrices(0, null)
+    generateMarketPrices(0, null, lastFetchedPrices)
   );
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   
