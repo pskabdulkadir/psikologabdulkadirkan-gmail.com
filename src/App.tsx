@@ -63,9 +63,9 @@ export default function App() {
     };
   });
 
-  // Simulator Data States
+  // Market Data States - Initialize with empty/zero prices (will be populated by live API)
   const [marketPrices, setMarketPrices] = useState<Record<string, ExchangeMarketData>>(
-    generateMarketPrices(0, null, lastFetchedPrices)
+    generateMarketPrices(0, null, null)
   );
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   
@@ -197,6 +197,13 @@ export default function App() {
   const [usePublicFeed, setUsePublicFeed] = useState<boolean>(true);
   const [publicFeedStatus, setPublicFeedStatus] = useState<'IDLE' | 'FETCHING' | 'LIVE' | 'ERROR'>('IDLE');
   const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
+
+  // Update market prices when live feed data arrives
+  useEffect(() => {
+    if (lastFetchedPrices) {
+      setMarketPrices(generateMarketPrices(0, marketPrices, lastFetchedPrices));
+    }
+  }, [lastFetchedPrices]);
 
   // Sync UI key updates dynamically to RuntimeAuthService (RAM only)
   useEffect(() => {
