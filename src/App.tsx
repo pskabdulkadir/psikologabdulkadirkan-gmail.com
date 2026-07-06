@@ -1,9 +1,18 @@
+<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
 import {
   Shield, Play, Pause, RefreshCw, Layers, TrendingUp, AlertTriangle,
   ArrowRight, DollarSign, Cpu, CheckCircle2, FileCode, Wifi, Clock,
   Lock, Settings, ShieldAlert, KeyRound, Check, Wallet, Send, LogOut, Info, AlertOctagon,
   FileDown
+=======
+import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Shield, Play, Pause, RefreshCw, Layers, TrendingUp, AlertTriangle,
+  ArrowRight, DollarSign, Cpu, CheckCircle2, FileCode, Wifi, Clock,
+  Lock, Settings, ShieldAlert, KeyRound, Check, Wallet, Send, LogOut, Info, AlertOctagon
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
 } from 'lucide-react';
 import {
   AssetSymbol, EngineMode, ExchangeConfig, ExchangeMarketData, ArbitrageOpportunity,
@@ -18,7 +27,10 @@ import ccxt from 'ccxt';
 import ZeroTrustContract from './components/ZeroTrustContract';
 import NetworkTrafficLogs from './components/NetworkTrafficLogs';
 import BinaryCompilerView from './components/BinaryCompilerView';
+<<<<<<< HEAD
 import RebateFarmingLab from './components/RebateFarmingLab';
+=======
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
 
 export default function App() {
   // Tabs
@@ -27,9 +39,12 @@ export default function App() {
   // Time Tracker (seconds)
   const [timeSeconds, setTimeSeconds] = useState<number>(0);
 
+<<<<<<< HEAD
   // Live internet network simulation status (ONLINE / OFFLINE)
   const [isNetworkOnline, setIsNetworkOnline] = useState<boolean>(true);
 
+=======
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
   // Offline background run tracking state
   const [offlineReport, setOfflineReport] = useState<{
     elapsedSeconds: number;
@@ -45,17 +60,26 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         parsed.whitelistedWallet = localStorage.getItem('secure_whitelisted_wallet') || parsed.whitelistedWallet || '';
+<<<<<<< HEAD
         // Force SECURE_REBATE environment for Rebate Farming Mode
         parsed.systemEnvironment = 'SECURE_REBATE';
+=======
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
         return parsed;
       } catch (e) {}
     }
     return {
       isRunning: false,
       engineMode: 'HFL_BOT', // Default is HFL Mode
+<<<<<<< HEAD
       systemEnvironment: 'SECURE_REBATE', // Default to Live Rebate Farming Modu
       minArbitrageBuffer: 0.01, // 0.01% standard limit requested
       tradeSizeUSD: 100.00, // starting with lowest volume test threshold
+=======
+      systemEnvironment: 'SIMULATION_DEMO',
+      minArbitrageBuffer: 0.01, // 0.01% standard limit requested
+      tradeSizeUSD: 5000.00, // standard virtual order sizing
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
       selectedAssets: ['BTC', 'ETH', 'SOL', 'AVAX', 'LINK'],
       profitLockThresholdUSD: 10.00, // HFL mode: triggers manual pause (Simulated lower for easy testing)
       autoWithdrawThresholdUSD: 5.00, // FALE mode: auto triggers withdraw (Simulated lower for easy testing)
@@ -63,16 +87,28 @@ export default function App() {
       isShutdown: false,
       consecutiveFailures: 0,
       apiKeys: {
+<<<<<<< HEAD
         binance: { apiKey: '', apiSecret: '', passphrase: '' },
         okx: { apiKey: '', apiSecret: '', passphrase: '' },
         coinbase: { apiKey: '', apiSecret: '', passphrase: '' }
+=======
+        binance: { apiKey: 'bin_f8a92e104b2b', apiSecret: 'bin_sec_9302bf71e0c', passphrase: '' },
+        okx: { apiKey: 'okx_cf29e01140df', apiSecret: 'okx_sec_728b9d0ea13', passphrase: 'LocalPassphraseSecure' },
+        coinbase: { apiKey: 'cb_pro_103fa0e902b', apiSecret: 'cb_sec_40a20e2e9d1', passphrase: '' }
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
       }
     };
   });
 
+<<<<<<< HEAD
   // Simulator Data States
   const [marketPrices, setMarketPrices] = useState<Record<string, ExchangeMarketData>>(
     generateMarketPrices(0, null)
+=======
+  // Market Data States - Initialize with empty/zero prices (will be populated by live API)
+  const [marketPrices, setMarketPrices] = useState<Record<string, ExchangeMarketData>>(
+    generateMarketPrices(0, null, null)
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
   );
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   
@@ -126,6 +162,7 @@ export default function App() {
 
   const [rebateEarnedUSD, setRebateEarnedUSD] = useState<number>(() => {
     const saved = localStorage.getItem('secure_rebate_earned');
+<<<<<<< HEAD
     return saved ? parseFloat(saved) : 0.00; // Clean live starting point
   });
 
@@ -227,6 +264,11 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+=======
+    return saved ? parseFloat(saved) : 10.00; // Default $10.00 activation bonus as requested for rebate verification
+  });
+
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
   const [referralIds, setReferralIds] = useState<{ binance: string; okx: string; coinbase: string }>(() => {
     const saved = localStorage.getItem('secure_referral_ids');
     if (saved) {
@@ -299,6 +341,7 @@ export default function App() {
   const [apiKeysVisible, setApiKeysVisible] = useState<boolean>(false);
   const [settingsSavedMessage, setSettingsSavedMessage] = useState<string>('');
 
+<<<<<<< HEAD
   const [usePublicFeed, setUsePublicFeed] = useState<boolean>(true);
   const [publicFeedStatus, setPublicFeedStatus] = useState<'IDLE' | 'FETCHING' | 'LIVE' | 'ERROR'>('IDLE');
   const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
@@ -325,10 +368,64 @@ export default function App() {
         } catch (e) {
           console.error('Failed to sync key to backend vault:', e);
         }
+=======
+  const [publicFeedStatus, setPublicFeedStatus] = useState<'IDLE' | 'FETCHING' | 'LIVE' | 'ERROR'>('IDLE');
+  const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
+  const hasInitialFetch = useRef(false);
+
+  // Compute market prices directly from lastFetchedPrices (no state update = no crash)
+  const computedMarketPrices = lastFetchedPrices
+    ? generateMarketPrices(0, marketPrices, lastFetchedPrices)
+    : marketPrices;
+
+  // Manual refresh handler
+  const handleManualRefresh = async () => {
+    setPublicFeedStatus('FETCHING');
+    try {
+      const result = await fetchPublicMarketData(engineConfig.selectedAssets);
+      if (result) {
+        setLastFetchedPrices(result);
+        setPublicFeedStatus('LIVE');
+      } else {
+        setPublicFeedStatus('ERROR');
+      }
+    } catch (err) {
+      setPublicFeedStatus('ERROR');
+    }
+  };
+
+  // Clear only TEST data - PRESERVE profit and rebate earnings
+  const handleClearAllData = () => {
+    if (confirm('SADECE TEST VERİLERİNİ SİL? (Kâr ve rebate korunacak)')) {
+      // Remove only test/demo data - DO NOT touch profit/earnings
+      const keysToRemove = [
+        'secure_order_logs',
+        'secure_withdrawal_logs',
+        'secure_total_withdrawn',
+        'secure_total_trades',
+        'secure_balances'
+      ];
+
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+
+      console.log('[CLEANUP] Test data cleared. Profits and earnings preserved.');
+      alert('Test verileri silindi. Kazanılan para ve rebate korundu.');
+      window.location.reload();
+    }
+  };
+
+  // Sync UI key updates dynamically to RuntimeAuthService (RAM only)
+  useEffect(() => {
+    if (engineConfig.apiKeys) {
+      Object.keys(engineConfig.apiKeys).forEach(exchangeId => {
+        const keys = engineConfig.apiKeys[exchangeId];
+        RuntimeAuthService.setKeys(exchangeId, keys.apiKey, keys.apiSecret, keys.passphrase);
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
       });
     }
   }, [engineConfig.apiKeys]);
 
+<<<<<<< HEAD
   // Public Credential-Free Feed fetching task from Backend API Cache
   useEffect(() => {
     if (!usePublicFeed) {
@@ -348,10 +445,31 @@ export default function App() {
           } else {
             setPublicFeedStatus('ERROR');
           }
+=======
+  // Auto-fetch every 15 seconds - safe with guards
+  useEffect(() => {
+    let isMounted = true;
+    let isFetching = false;
+
+    const fetchPrices = async () => {
+      if (!isMounted || isFetching) return;
+
+      isFetching = true;
+
+      try {
+        setPublicFeedStatus('FETCHING');
+        const result = await fetchPublicMarketData(engineConfig.selectedAssets);
+        if (!isMounted) return;
+
+        if (result) {
+          setLastFetchedPrices(result);
+          setPublicFeedStatus('LIVE');
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
         } else {
           setPublicFeedStatus('ERROR');
         }
       } catch (err) {
+<<<<<<< HEAD
         setPublicFeedStatus('ERROR');
       }
     };
@@ -360,6 +478,27 @@ export default function App() {
     const interval = setInterval(fetchPrices, 5000); // refresh every 5s for fast production updates
     return () => clearInterval(interval);
   }, [usePublicFeed, engineConfig.selectedAssets]);
+=======
+        if (isMounted) {
+          setPublicFeedStatus('ERROR');
+        }
+      } finally {
+        isFetching = false;
+      }
+    };
+
+    // Initial fetch
+    fetchPrices();
+
+    // Auto-refresh every 1 second
+    const interval = setInterval(fetchPrices, 1000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []); // Empty dependencies - fetch only once on mount
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
 
   const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret' | 'passphrase', value: string) => {
     setEngineConfig(prev => {
@@ -414,10 +553,13 @@ export default function App() {
   }, [rebateEarnedUSD]);
 
   useEffect(() => {
+<<<<<<< HEAD
     localStorage.setItem('secure_total_volume', totalVolumeUSD.toString());
   }, [totalVolumeUSD]);
 
   useEffect(() => {
+=======
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
     localStorage.setItem('secure_total_trades', totalTradesExecuted.toString());
   }, [totalTradesExecuted]);
 
@@ -512,6 +654,7 @@ export default function App() {
                 return updated;
               });
 
+<<<<<<< HEAD
               setOrderLogs((prev) => [...newOfflineOrders, ...prev].slice(0, 40));
               setTotalTradesExecuted((prev) => prev + trades * 2);
               
@@ -563,10 +706,44 @@ export default function App() {
                 profit: calculatedProfit,
                 withdrawn: triggeredWithdrawal
               });
+=======
+              setOrderLogs((prev) => [...newOfflineOrders.reverse(), ...prev].slice(0, 200));
+              setAccumulatedProfitUSD((prev) => Number((prev + calculatedProfit).toFixed(4)));
+              setTotalTradesExecuted((prev) => prev + trades);
+
+              // Automated withdrawal if threshold is met
+              if (savedConfig.engineMode === 'FALE' && calculatedProfit >= savedConfig.autoWithdrawThresholdUSD) {
+                setWithdrawalLogs((prev) => [
+                  {
+                    id: `auto-${Date.now()}`,
+                    timestamp: Date.now(),
+                    amount: calculatedProfit,
+                    destination: wallet,
+                    status: 'COMPLETED',
+                    txHash: generateLocalHash(`auto-${Date.now()}`)
+                  },
+                  ...prev
+                ]);
+                setOfflineReport({
+                  elapsedSeconds: elapsedSec,
+                  tradesCount: trades,
+                  profit: calculatedProfit,
+                  withdrawn: true
+                });
+              } else {
+                setOfflineReport({
+                  elapsedSeconds: elapsedSec,
+                  tradesCount: trades,
+                  profit: calculatedProfit,
+                  withdrawn: false
+                });
+              }
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
             }
           }
         }
       } catch (e) {
+<<<<<<< HEAD
         console.error("Error loading offline run simulation:", e);
       }
     }
@@ -934,6 +1111,31 @@ export default function App() {
     const nextFailures = engineConfig.consecutiveFailures + 1;
     
     const failedOrderId = `ord-fail-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+=======
+        console.error('Offline calculation error:', e);
+      }
+    }
+  }, []);
+
+  const triggerAutonomousWithdrawal = (amount: number) => {
+    const withdrawal: WithdrawalLog = {
+      id: `auto-${Date.now()}`,
+      timestamp: Date.now(),
+      amount,
+      destination: engineConfig.whitelistedWallet,
+      status: 'COMPLETED',
+      txHash: generateLocalHash(`auto-${Date.now()}`)
+    };
+    setWithdrawalLogs(prev => [withdrawal, ...prev.slice(0, 19)]);
+  };
+
+  const triggerSimulatedOrderFailure = () => {
+    const failureId = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const nextFailures = engineConfig.consecutiveFailures + 1;
+
+    // Create failed order log
+    const failedOrderId = `fail-${failureId}`;
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
     const failedLog: OrderLog = {
       id: failedOrderId,
       timestamp: Date.now(),
@@ -1146,14 +1348,22 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-white font-sans">
+<<<<<<< HEAD
                   ZERO-TRUST REBATE & VOLUME ENGINE
+=======
+                  ZERO-TRUST ARBITRAGE ENGINE
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                 </h1>
                 <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-medium tracking-wider uppercase">
                   ACTIVE CORE
                 </span>
               </div>
               <p className="text-xs text-gray-400">
+<<<<<<< HEAD
                 Maker-Only Hacim Üretimi, Komisyon İadesi (Rebate) ve Otonom Kasa Yönetimi (HFL-BOT & FALE)
+=======
+                Tam İzole Borsa İçi Arbitraj, Hacim Üretimi ve Otonom Kasa Yönetimi (HFL-BOT & FALE)
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
               </p>
             </div>
           </div>
@@ -1385,11 +1595,16 @@ export default function App() {
             {/* Left side: Data Streamer Toggle */}
             <div className="bg-black/40 border border-gray-900 rounded-lg p-4 flex flex-col justify-between">
               <div>
+<<<<<<< HEAD
                 <div className="flex justify-between items-center mb-2">
+=======
+                <div className="mb-2">
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                   <h4 className="text-xs font-mono font-bold text-gray-300 uppercase flex items-center gap-1.5">
                     <Wifi className="w-3.5 h-3.5 text-emerald-400" />
                     Halka Açık Canlı Veri Sağlayıcı (Data Feeder)
                   </h4>
+<<<<<<< HEAD
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
                       type="checkbox" 
@@ -1399,11 +1614,14 @@ export default function App() {
                     />
                     <div className="w-9 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
                   </label>
+=======
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                 </div>
                 <p className="text-[11px] text-gray-500 leading-relaxed font-mono">
                   Binance Public API & CoinGecko sunucularına doğrudan (anahtarsız) bağlanarak gerçek zamanlı kripto para fiyatlarını çeker.
                 </p>
               </div>
+<<<<<<< HEAD
               <div className="mt-4 pt-2 border-t border-gray-900/40 flex items-center justify-between font-mono text-[10px]">
                 <span className="text-gray-400">Bağlantı Durumu:</span>
                 {publicFeedStatus === 'LIVE' ? (
@@ -1424,13 +1642,49 @@ export default function App() {
                 ) : (
                   <span className="text-gray-500 font-bold">KAPALI (BROWNIAN SIMULATION)</span>
                 )}
+=======
+              <div className="mt-4 pt-2 border-t border-gray-900/40 space-y-2">
+                <div className="flex items-center justify-between font-mono text-[10px]">
+                  <span className="text-gray-400">Bağlantı Durumu:</span>
+                  {publicFeedStatus === 'LIVE' ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                      CANLI (GERÇEK VERİ AKTİF)
+                    </span>
+                  ) : publicFeedStatus === 'FETCHING' ? (
+                    <span className="text-amber-400 flex items-center gap-1 animate-pulse">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      VERİLER ÇEKİLİYOR...
+                    </span>
+                  ) : publicFeedStatus === 'ERROR' ? (
+                    <span className="text-red-400 font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      BAĞLANTI HATASI
+                    </span>
+                  ) : (
+                    <span className="text-gray-500 font-bold">KAPALI</span>
+                  )}
+                </div>
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={publicFeedStatus === 'FETCHING'}
+                  className="w-full px-2 py-1 bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-mono transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  VERİLERİ YENİLE
+                </button>
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
               </div>
             </div>
 
             {/* Right side: Analytics Engine */}
             <div className="bg-black/40 border border-gray-900 rounded-lg p-4 font-mono text-xs flex flex-col justify-between">
               {(() => {
+<<<<<<< HEAD
                 const analytics = runOrderbookAnalytics(marketPrices, engineConfig.selectedAssets, engineConfig.tradeSizeUSD);
+=======
+                const analytics = runOrderbookAnalytics(computedMarketPrices, engineConfig.selectedAssets, engineConfig.tradeSizeUSD);
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                 return (
                   <>
                     <div className="flex justify-between items-center mb-2">
@@ -1479,7 +1733,11 @@ export default function App() {
                 : 'border-transparent text-gray-500 hover:text-gray-300'
             }`}
           >
+<<<<<<< HEAD
             📊 REBATE VE HACİM İZLEME
+=======
+            📊 ARBİTRAJ VE ENTROPİ İZLEME
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
           </button>
           <button
             id="tab-network"
@@ -1538,6 +1796,7 @@ export default function App() {
         {activeTab === 'monitoring' && (
           <div className="space-y-6">
             
+<<<<<<< HEAD
              {/* Top Bento Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               
@@ -1597,6 +1856,62 @@ export default function App() {
                 ) : (
                   <p className="text-[9px] text-gray-500 mt-1.5 flex items-center gap-1">
                     <Shield className="w-3 h-3 text-emerald-500" /> Sıfır Sermaye Koruma
+=======
+            {/* Top Bento Stats Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* Metric 1 */}
+              <div className="bg-gray-950 border border-gray-900 p-4 rounded-xl font-mono relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl" />
+                <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" /> BİRİKEN CEX KÂRI
+                </p>
+                <p className="text-lg font-bold text-emerald-400 mt-1">${accumulatedProfitUSD.toFixed(4)} USDT</p>
+                <p className="text-[9px] text-gray-500 mt-1 flex items-center gap-1">
+                  <Info className="w-3.5 h-3.5 text-gray-600" /> 
+                  {engineConfig.engineMode === 'HFL_BOT' ? `Kar Kilidi: $${engineConfig.profitLockThresholdUSD}` : `Oto Çekim: $${engineConfig.autoWithdrawThresholdUSD}`}
+                </p>
+              </div>
+
+              {/* Metric 2 */}
+              <div className="bg-gray-950 border border-gray-900 p-4 rounded-xl font-mono relative overflow-hidden">
+                <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                  <Wallet className="w-3.5 h-3.5 text-emerald-400" /> TOTAL WITHDRAWN
+                </p>
+                <p className="text-lg font-bold text-gray-100 mt-1">${totalWithdrawnUSD.toFixed(4)} USDT</p>
+                <p className="text-[9px] text-emerald-400 font-mono mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Auto-Vault Safe Mode
+                </p>
+              </div>
+
+              {/* Metric 3 */}
+              <div className="bg-gray-950 border border-gray-900 p-4 rounded-xl font-mono relative overflow-hidden">
+                <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> AFFILIATE REBATES
+                </p>
+                <p className="text-lg font-bold text-emerald-400 mt-1">${rebateEarnedUSD.toFixed(4)} USDT</p>
+                <p className="text-[9px] text-gray-500 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Maker Rebate Backing
+                </p>
+              </div>
+
+              {/* Metric 4 */}
+              <div className="bg-gray-950 border border-gray-900 p-4 rounded-xl font-mono relative overflow-hidden">
+                <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                  <Lock className="w-3.5 h-3.5 text-emerald-400" /> MOTOR GÜVENLİK VE ÇALIŞMA MODU
+                </p>
+                <p className="text-md font-bold text-emerald-400 mt-1 uppercase flex items-center gap-1.5">
+                  {engineConfig.engineMode === 'HFL_BOT' ? 'HFL-BOT (SAFE)' : 'FALE (AUTONOMOUS)'}
+                </p>
+                {engineConfig.isRunning && !engineConfig.isShutdown ? (
+                  <div className="text-[9px] text-emerald-400 mt-1.5 flex items-center gap-1.5 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    <span>7/24 ARALIKSIZ AKTİF</span>
+                  </div>
+                ) : (
+                  <p className="text-[9px] text-gray-500 mt-1.5 flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-emerald-500" /> Outbound Telemetry: Locked
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                   </p>
                 )}
               </div>
@@ -1659,6 +1974,7 @@ export default function App() {
               </div>
             )}
 
+<<<<<<< HEAD
             {/* 📊 BUGÜN NE KADAR KOMİSYON İADESİ BİRİKTİ? (CEX REBATE ACCOUNTING DASHBOARD) */}
             <div className="bg-gray-950 border-2 border-emerald-500/30 rounded-xl p-6 font-mono relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1798,6 +2114,8 @@ export default function App() {
               </div>
             </div>
 
+=======
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
             {/* Main Workspace split: Left Side Live Arb / Right Side CEX configuration */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
@@ -1931,7 +2249,11 @@ export default function App() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
                     {EXCHANGES.map((exch) => {
+<<<<<<< HEAD
                       const data = marketPrices[exch.id]?.[selectedMonitoringAsset];
+=======
+                      const data = computedMarketPrices[exch.id]?.[selectedMonitoringAsset];
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                       return (
                         <div key={exch.id} className="bg-gray-900/20 border border-gray-900 p-3 rounded-lg space-y-2">
                           <div className="flex items-center justify-between border-b border-gray-900 pb-2">
@@ -1971,6 +2293,7 @@ export default function App() {
                     <span className="text-xs text-emerald-400 font-mono font-bold">100% TRANSPARENT</span>
                   </div>
 
+<<<<<<< HEAD
                   <div className="max-h-[180px] overflow-y-auto font-mono text-[11px] leading-relaxed space-y-2">
                     {withdrawalLogs.length === 0 ? (
                       <div className="text-center py-6 text-gray-600 italic">
@@ -1993,6 +2316,40 @@ export default function App() {
                           <div className="text-right sm:text-right text-[10px] text-gray-500 font-mono shrink-0">
                             <p>Tarih: {new Date(log.timestamp).toLocaleTimeString()}</p>
                             <p className="truncate w-40 text-gray-600 select-all hover:text-gray-400">TX: {log.txHash.substring(0, 24)}...</p>
+=======
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {withdrawalLogs.length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 text-xs">
+                        Henüz Whitelist çekimi yapılmamış...
+                      </div>
+                    ) : (
+                      withdrawalLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="grid grid-cols-1 sm:grid-cols-5 gap-3 bg-gray-900/20 p-3 rounded-lg border border-gray-900 text-xs font-mono"
+                        >
+                          <div>
+                            <span className="text-gray-500 text-[10px]">ÇEKİM KİMLİĞİ</span>
+                            <div className="text-gray-300 font-mono text-[10px] truncate">{log.id}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">TARİH & SAATİ</span>
+                            <div className="text-gray-300">{new Date(log.timestamp).toLocaleTimeString()}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">ÇEKİLEN TUTAR</span>
+                            <div className="text-emerald-400 font-bold">${log.amount.toFixed(4)} USDT</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">HEDEFİ (WALLET)</span>
+                            <div className="text-gray-300 font-mono text-[10px] truncate">{log.destination}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">DURUM</span>
+                            <div className={`font-bold ${log.status === 'COMPLETED' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {log.status === 'COMPLETED' ? '✅ TAMAMLANDI' : log.status === 'PENDING' ? '⏳ BEKLEME' : '❌ RED'}
+                            </div>
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                           </div>
                         </div>
                       ))
@@ -2000,11 +2357,16 @@ export default function App() {
                   </div>
                 </div>
 
+<<<<<<< HEAD
                 {/* Executed Arbitrage Orders Log Ledger */}
+=======
+                {/* Order Audit Log (Transaction Records) */}
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                 <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
                   <div className="flex items-center justify-between border-b border-gray-900 pb-4 mb-4">
                     <div>
                       <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono">
+<<<<<<< HEAD
                         İŞLEM GEÇMİŞİ VE MİKROSANİYE RAPORU (LEDGER)
                       </h3>
                       <p className="text-xs text-gray-500">Milisaniyelik borsa emir kayıtları</p>
@@ -2123,10 +2485,116 @@ export default function App() {
                         ${totalPortfolioValueUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                       </p>
                       <p className="text-[9px] text-gray-500 mt-1">Gerçek borsa cüzdan bakiyelerinizin (USD bazlı) ve spot varlıkların anlık toplanmış konsolide değeridir.</p>
+=======
+                        BORSADA TAMAMLANAN EMİRLER (ORDER BOOK AUDIT)
+                      </h3>
+                      <p className="text-xs text-gray-500">Her bir alış/satış işleminin tam kaydı ve durum bilgisi</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        id="btn-reset-ledger"
+                        onClick={handleResetLedger}
+                        className="text-xs bg-red-950/20 hover:bg-red-900/30 text-red-400 border border-red-500/20 px-3 py-1.5 rounded font-mono font-bold transition duration-150"
+                      >
+                        🔄 DEFTER SIFIRLASİ (FULL RESET)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {orderLogs.length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 text-xs">
+                        Henüz emir kaydı yok. Bot aktif hale getirin veya emir hatası tetikleyin...
+                      </div>
+                    ) : (
+                      orderLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          className={`grid grid-cols-1 sm:grid-cols-6 gap-2 p-3 rounded-lg border font-mono text-xs ${
+                            log.status === 'COMPLETED'
+                              ? 'bg-emerald-950/20 border-emerald-500/20'
+                              : log.status === 'REJECTED'
+                              ? 'bg-red-950/20 border-red-500/20'
+                              : 'bg-amber-950/20 border-amber-500/20'
+                          }`}
+                        >
+                          <div>
+                            <span className="text-gray-500 text-[10px]">ZAMANLAMASI</span>
+                            <div className="text-gray-300">{new Date(log.timestamp).toLocaleTimeString()}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">VARLIQ</span>
+                            <div className="text-white font-bold">{log.asset}/USDT</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">TİP</span>
+                            <div className={log.type === 'BUY' ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>{log.type}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">BORSA</span>
+                            <div className="text-gray-300">{log.exchange}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">FİYAT × MİKTAR</span>
+                            <div className="text-gray-300">${log.price} × {log.quantity}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">DURUM</span>
+                            <div className={`font-bold ${
+                              log.status === 'COMPLETED' ? 'text-emerald-400' : 
+                              log.status === 'REJECTED' ? 'text-red-400' : 'text-amber-400'
+                            }`}>
+                              {log.status === 'COMPLETED' ? '✅' : log.status === 'REJECTED' ? '❌' : '⏳'} {log.status}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT SIDE: CEX Settings Panel (4 Columns) */}
+              <div className="lg:col-span-4 space-y-6">
+                
+                {/* Portfolio Breakdown */}
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <div className="border-b border-gray-900 pb-4 mb-4">
+                    <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-emerald-400" />
+                      Portfolio Dağılımı
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">3 borsada dağıtılmış varlıklar</p>
+                  </div>
+
+                  <div className="space-y-3 font-mono text-xs">
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">💵 USDT Toplam:</span>
+                      <span className="text-emerald-400 font-bold">${sums.totalUsdt.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">₿ BTC Toplam:</span>
+                      <span className="text-white font-bold">{sums.totalBtc.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">Ξ ETH Toplam:</span>
+                      <span className="text-white font-bold">{sums.totalEth.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">◎ SOL Toplam:</span>
+                      <span className="text-white font-bold">{sums.totalSol.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-900/40">
+                      <div className="bg-emerald-950/10 border border-emerald-500/20 p-3 rounded-lg font-mono text-xs">
+                        <p className="text-gray-400 text-[10px] uppercase">TOPLAM KONSOLİDE PORTFÖY DEĞERİ (USD)</p>
+                        <p className="text-emerald-400 font-bold text-lg mt-1">${totalPortfolioValueUSD.toFixed(2)}</p>
+                      </div>
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                     </div>
                   </div>
                 </div>
 
+<<<<<<< HEAD
                 {/* BOT MODE SELECTOR (HFL-BOT vs. FALE) */}
                 <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
                   <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono border-b border-gray-900 pb-3 mb-3">
@@ -2301,11 +2769,83 @@ export default function App() {
                   <form onSubmit={handleSaveWallet} className="space-y-3">
                     <div>
                       <label className="block text-gray-400 mb-1.5 uppercase">Kişisel Cüzdan Adresiniz (USDT/ERC20/TRC20)</label>
+=======
+                {/* Engine Settings Panel */}
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <form onSubmit={handleSaveParameters} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono">
+                        Arbitraj Minimum Tampon (%):
+                      </label>
+                      <input
+                        type="text"
+                        value={tempBuffer}
+                        onChange={(e) => setTempBuffer(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">Minimum net spread kabul edilebilir miktar</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono">
+                        Sipariş Büyüklüğü (USD):
+                      </label>
+                      <input
+                        type="text"
+                        value={tempTradeSize}
+                        onChange={(e) => setTempTradeSize(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">Her bir arbitraj döngüsünde kullanılan USDT</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono">
+                        {engineConfig.engineMode === 'HFL_BOT' ? 'Kar Kilidi Eşiği ($):' : 'Oto Çekim Eşiği ($):'}
+                      </label>
+                      <input
+                        type="text"
+                        value={engineConfig.engineMode === 'HFL_BOT' ? tempProfitLock : tempAutoWithdraw}
+                        onChange={(e) => engineConfig.engineMode === 'HFL_BOT' ? setTempProfitLock(e.target.value) : setTempAutoWithdraw(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        {engineConfig.engineMode === 'HFL_BOT' 
+                          ? 'Botun işlemi durdurduğu kâr seviyesi'
+                          : 'Otomatik Whitelist çekiminin tetiklenme seviyesi'}
+                      </p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
+                    >
+                      ✓ PARAMETRELERI KAYDET
+                    </button>
+                  </form>
+
+                  {settingsSavedMessage && (
+                    <div className="mt-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2 rounded text-center">
+                      {settingsSavedMessage}
+                    </div>
+                  )}
+                </div>
+
+                {/* Whitelisted Wallet Manager */}
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <form onSubmit={handleSaveWallet} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono flex items-center gap-2">
+                        <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                        Beyaz Liste Cüzdan Adresi:
+                      </label>
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
                       <input
                         id="input-whitelisted-wallet"
                         type="text"
                         value={tempWallet}
                         onChange={(e) => setTempWallet(e.target.value)}
+<<<<<<< HEAD
                         className="w-full bg-black border border-gray-900 p-2.5 rounded text-gray-200 font-mono focus:border-emerald-500/50 outline-none text-[11px]"
                         placeholder="0x... veya T... cüzdan adresinizi buraya girin"
                       />
@@ -2559,3 +3099,103 @@ function ShieldCheckIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+=======
+                        placeholder="0x..."
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">Otonom çekimlerin gideceği güvenli adres</p>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
+                    >
+                      ✓ CÜZDAN ADRESINI KAYDET
+                    </button>
+                  </form>
+
+                  {walletSavedMessage && (
+                    <div className="mt-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2 rounded text-center">
+                      {walletSavedMessage}
+                    </div>
+                  )}
+                </div>
+
+                {/* Exchange API Key Manager */}
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono">
+                      Borsa API Anahtar Yönetimi
+                    </h4>
+                    <button
+                      onClick={() => setApiKeysVisible(!apiKeysVisible)}
+                      className={`text-xs font-mono font-bold px-2 py-1 rounded transition ${
+                        apiKeysVisible
+                          ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          : 'bg-gray-900 text-gray-400 border border-gray-800'
+                      }`}
+                    >
+                      {apiKeysVisible ? '🔒 GİZLE' : '🔑 GÖSTER'}
+                    </button>
+                  </div>
+
+                  {apiKeysVisible && (
+                    <div className="space-y-4">
+                      {Object.entries(engineConfig.apiKeys).map(([exchangeId, keys]) => (
+                        <div key={exchangeId} className="space-y-2 bg-gray-900/20 p-3 rounded border border-gray-900">
+                          <h5 className="text-xs font-bold text-gray-300 uppercase font-mono">{exchangeId.toUpperCase()}</h5>
+                          <input
+                            type="password"
+                            placeholder="API Key"
+                            value={keys.apiKey}
+                            onChange={(e) => handleUpdateApiKey(exchangeId, 'apiKey', e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                          />
+                          <input
+                            type="password"
+                            placeholder="API Secret"
+                            value={keys.apiSecret}
+                            onChange={(e) => handleUpdateApiKey(exchangeId, 'apiSecret', e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                          />
+                          {keys.passphrase !== undefined && (
+                            <input
+                              type="password"
+                              placeholder="Passphrase (if applicable)"
+                              value={keys.passphrase || ''}
+                              onChange={(e) => handleUpdateApiKey(exchangeId, 'passphrase', e.target.value)}
+                              className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          )}
+                        </div>
+                      ))}
+
+                      <button
+                        onClick={loadOpenSourceTestKeys}
+                        className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
+                      >
+                        📚 AÇIK KAYNAK TEST ANAHTAR YÜKLE
+                      </button>
+
+                      <p className="text-[10px] text-gray-500">
+                        ⚠️ Anahtarlar sadece tarayıcı RAM belleğinde (localStorage) saklı kalır. Sunucu tarafına gönderilmez.
+                      </p>
+
+                      <button
+                        onClick={handleClearAllData}
+                        className="w-full bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-500/30 text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
+                      >
+                        🗑️ TEST VERİLERİNİ SİL (Gerçek işlemler korunur)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+>>>>>>> e351a9c7ee322cb73df1923329ee92b302035546
