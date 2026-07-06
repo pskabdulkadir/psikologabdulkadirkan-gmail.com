@@ -254,13 +254,8 @@ export default function App() {
     }
   }, [engineConfig.apiKeys]);
 
-  // Public Credential-Free Feed fetching task - Initial load only
-  useEffect(() => {
-    if (!usePublicFeed) {
-      setPublicFeedStatus('IDLE');
-      return;
-    }
-
+  // Initial fetch - only once on mount (not on every dependency change)
+  React.useEffect(() => {
     let isMounted = true;
 
     const fetchPrices = async () => {
@@ -284,13 +279,16 @@ export default function App() {
       }
     };
 
-    // Initial fetch only - no periodic refresh to avoid DOM thrashing
-    fetchPrices();
+    if (usePublicFeed) {
+      fetchPrices();
+    } else {
+      setPublicFeedStatus('IDLE');
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [usePublicFeed]);
+  }, []); // Empty dependencies - fetch only once on mount
 
   const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret' | 'passphrase', value: string) => {
     setEngineConfig(prev => {
