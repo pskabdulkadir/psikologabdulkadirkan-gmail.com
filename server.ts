@@ -516,7 +516,24 @@ async function startServer() {
     // Fallback to index.html for SPA routing (catch all remaining requests)
     app.get('*', (req, res) => {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      try {
+        res.sendFile(indexPath);
+      } catch (err) {
+        // Fallback: render minimal HTML if index.html not found
+        res.send(`<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZERO-TRUST REBATE & VOLUME ENGINE</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/assets/index-CHb-34UK.js"></script>
+</body>
+</html>`);
+      }
     });
   }
 
