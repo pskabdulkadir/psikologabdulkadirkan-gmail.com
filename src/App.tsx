@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Shield, Play, Pause, RefreshCw, Layers, TrendingUp, AlertTriangle,
   ArrowRight, DollarSign, Cpu, CheckCircle2, FileCode, Wifi, Clock,
@@ -255,7 +256,7 @@ export default function App() {
   }, [engineConfig.apiKeys]);
 
   // Initial fetch - only once on mount (not on every dependency change)
-  React.useEffect(() => {
+  useEffect(() => {
     let isMounted = true;
 
     const fetchPrices = async () => {
