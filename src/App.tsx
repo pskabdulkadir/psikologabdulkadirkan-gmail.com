@@ -923,20 +923,11 @@ export default function App() {
             {/* Left side: Data Streamer Toggle */}
             <div className="bg-black/40 border border-gray-900 rounded-lg p-4 flex flex-col justify-between">
               <div>
-                <div className="flex justify-between items-center mb-2">
+                <div className="mb-2">
                   <h4 className="text-xs font-mono font-bold text-gray-300 uppercase flex items-center gap-1.5">
                     <Wifi className="w-3.5 h-3.5 text-emerald-400" />
                     Halka Açık Canlı Veri Sağlayıcı (Data Feeder)
                   </h4>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={usePublicFeed} 
-                      onChange={(e) => setUsePublicFeed(e.target.checked)} 
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
                 </div>
                 <p className="text-[11px] text-gray-500 leading-relaxed font-mono">
                   Binance Public API & CoinGecko sunucularına doğrudan (anahtarsız) bağlanarak gerçek zamanlı kripto para fiyatlarını çeker.
