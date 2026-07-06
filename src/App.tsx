@@ -201,7 +201,7 @@ export default function App() {
   // Update market prices when live feed data arrives
   useEffect(() => {
     if (lastFetchedPrices) {
-      setMarketPrices(generateMarketPrices(0, marketPrices, lastFetchedPrices));
+      setMarketPrices(prevPrices => generateMarketPrices(0, prevPrices, lastFetchedPrices));
     }
   }, [lastFetchedPrices]);
 
@@ -221,11 +221,16 @@ export default function App() {
       setPublicFeedStatus('IDLE');
       return;
     }
-    
+
+    let isMounted = true;
+
     const fetchPrices = async () => {
-      setPublicFeedStatus('FETCHING');
+      if (!isMounted) return;
+
       try {
         const result = await fetchPublicMarketData(engineConfig.selectedAssets);
+        if (!isMounted) return;
+
         if (result) {
           setLastFetchedPrices(result);
           setPublicFeedStatus('LIVE');
@@ -233,13 +238,22 @@ export default function App() {
           setPublicFeedStatus('ERROR');
         }
       } catch (err) {
-        setPublicFeedStatus('ERROR');
+        if (isMounted) {
+          setPublicFeedStatus('ERROR');
+        }
       }
     };
 
+    // Initial fetch
     fetchPrices();
-    const interval = setInterval(fetchPrices, 15000); // refresh every 15s
-    return () => clearInterval(interval);
+
+    // Periodic refresh every 30s (increased from 15s to reduce DOM thrashing)
+    const interval = setInterval(fetchPrices, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [usePublicFeed, engineConfig.selectedAssets]);
 
   const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret' | 'passphrase', value: string) => {
