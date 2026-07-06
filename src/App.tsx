@@ -259,12 +259,15 @@ export default function App() {
     }
   }, [engineConfig.apiKeys]);
 
-  // Single fetch on mount only - NO periodic refresh
+  // Auto-fetch every 15 seconds - safe with guards
   useEffect(() => {
     let isMounted = true;
+    let isFetching = false;
 
     const fetchPrices = async () => {
-      if (!isMounted) return;
+      if (!isMounted || isFetching) return;
+
+      isFetching = true;
 
       try {
         setPublicFeedStatus('FETCHING');
@@ -281,13 +284,20 @@ export default function App() {
         if (isMounted) {
           setPublicFeedStatus('ERROR');
         }
+      } finally {
+        isFetching = false;
       }
     };
 
+    // Initial fetch
     fetchPrices();
+
+    // Auto-refresh every 15 seconds
+    const interval = setInterval(fetchPrices, 15000);
 
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
   }, []); // Empty dependencies - fetch only once on mount
 
