@@ -58,9 +58,9 @@ export default function RebateFarmingLab({
     
     const timestamp = new Date().toLocaleTimeString();
     setFailSafeLogs((prev) => [
-      `[${timestamp}] ⚠️ AĞ BAĞLANTISI KOPARILDI: Fail-Safe tetiklendi!`,
-      `[${timestamp}] 🔒 KORUMA AKTİF: Maker emirleri tamamen donduruldu.`,
-      `[${timestamp}] 📈 Hacim hedefi duraklatıldı. Sermaye sıfır risk altında.`,
+      `[${timestamp}] Ağ bağlantısı kopıldı: Fail-Safe tetiklendi!`,
+      `[${timestamp}] Koruma aktif: Maker emirleri tamamen donduruldu.`,
+      `[${timestamp}] Hacim hedefi duraklatıldı. Sermaye sıfır risk altında.`,
       ...prev
     ]);
   };
@@ -72,9 +72,9 @@ export default function RebateFarmingLab({
     
     const timestamp = new Date().toLocaleTimeString();
     setFailSafeLogs((prev) => [
-      `[${timestamp}] ⚡ AĞ BAĞLANTISI GERİ GELDİ: Sistem yeniden bağlandı.`,
-      `[${timestamp}] 🚀 BAĞLANTI BAŞARILI: Hacim üretimi kaldığı yerden devam ediyor.`,
-      `[${timestamp}] ✔️ %100 otonom senkronizasyon tamamlandı.`,
+      `[${timestamp}] Ağ bağlantısı geri geldi: Sistem yeniden bağlandı.`,
+      `[${timestamp}] Bağlantı başarılı: Hacim üretimi kaldığı yerden devam ediyor.`,
+      `[${timestamp}] %100 otonom senkronizasyon tamamlandı.`,
       ...prev
     ]);
   };
@@ -90,7 +90,6 @@ export default function RebateFarmingLab({
 
   return (
     <div className="space-y-6">
-      
       {/* SECTION 1: ORDER BOOK LIQUIDITY & PLACEMENT TESTER */}
       <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 font-mono text-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-900 pb-4 mb-4 gap-2">
@@ -457,7 +456,7 @@ export default function RebateFarmingLab({
                   <div>
                     <span className="text-gray-200 font-bold">Binance Market Maker Programı Uyumluluğu:</span>
                     <p className="text-gray-500 text-[10px] mt-0.5">
-                      Binance Spot Market Maker programında VIP 1-9 sınıfları için Maker ücreti <strong>-%0.005</strong> ile <strong>-%0.012</strong> (Negatif fee / Rebate) olarak uygulanmaktadır. Girdiğiniz oran bu aralığa tam uyumludur.
+                      Binance Spot Market Maker programında VIP 1-9 sınıfları için Maker ücreti -0.005 ile -0.012 (Negatif fee / Rebate) olarak uygulanmaktadır. Girdiğiniz oran bu aralığa tam uyumludur.
                     </p>
                   </div>
                 </div>
@@ -467,7 +466,7 @@ export default function RebateFarmingLab({
                   <div>
                     <span className="text-gray-200 font-bold">OKX VIP & Market Maker Programı Uyumluluğu:</span>
                     <p className="text-gray-500 text-[10px] mt-0.5">
-                      OKX borsasında VIP Maker programlarında Maker limit emirlerine uygulanan iade yüzdesi <strong>-%0.010</strong> seviyesine kadar çıkmaktadır. Bu modelde komisyon ödemek yerine borsa doğrudan hesaba iade yapar.
+                      OKX borsasında VIP Maker programlarında Maker limit emirlerine uygulanan iade yüzdesi -0.010 seviyesine kadar çıkmaktadır. Bu modelde komisyon ödemek yerine borsa doğrudan hesaba iade yapar.
                     </p>
                   </div>
                 </div>
@@ -477,7 +476,7 @@ export default function RebateFarmingLab({
                   <div>
                     <span className="text-gray-200 font-bold">Otonom Referans İade Güvencesi:</span>
                     <p className="text-gray-500 text-[10px] mt-0.5">
-                      Yukarıda girilen referans kodları üzerinden üretilen hacim, borsanın geri ödeme sisteminde anında tetiklenir ve payınız gün sonunda <strong>sizin kendi spot cüzdanınıza</strong> yansıtılır.
+                      Yukarıda girilen referans kodları üzerinden üretilen hacim, borsanın geri ödeme sisteminde anında tetiklenir ve payınız gün sonunda sizin kendi spot cüzdanınıza yansıtılır.
                     </p>
                   </div>
                 </div>
