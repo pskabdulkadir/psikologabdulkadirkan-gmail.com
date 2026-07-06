@@ -11,15 +11,10 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "ccxt": "^4.5.64",
-=======
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
