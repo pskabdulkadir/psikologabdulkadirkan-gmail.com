@@ -6,7 +6,13 @@ import ccxt from 'ccxt';
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+// Middleware to ensure JSON APIs return proper content-type with UTF-8 charset
+app.use('/api/', (req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
+
+const PORT = process.env.PORT || 3000;
 
 // Supported asset symbols
 type AssetSymbol = 'BTC' | 'ETH' | 'SOL' | 'AVAX' | 'LINK';
@@ -144,6 +150,124 @@ app.get('/api/volume/metrics', (req, res) => {
       { date: "2026-07-05", volume: v2, rebateRate: "0.05%", rebateEarned: r2, status: "CREDITED", source: hasLiveKeys ? "CEX_API_REPORT" : "VAULT_MEM" },
       { date: "2026-07-04", volume: v3, rebateRate: "0.05%", rebateEarned: r3, status: "CREDITED", source: hasLiveKeys ? "CEX_API_REPORT" : "VAULT_MEM" }
     ]
+  });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    node_env: process.env.NODE_ENV || 'development'
+  });
+});
+
+// GET volume farming status endpoint
+app.get('/api/volume/status', (req, res) => {
+  const hasLiveKeys = Object.values(store.keys).some(k => k.apiKey && k.apiSecret);
+  res.json({
+    strategy: 'REBATE_FARMING_MAKER',
+    status: hasLiveKeys ? 'ACTIVE' : 'SANDBOX_MODE',
+    healthy: store.consecutiveFailures < 3,
+    volumeProgress: store.totalVolumeUSD,
+    dailyVolume: store.totalVolumeUSD,
+    dailyTarget: 100000.00,
+    dailyRebate: store.totalRebateUSD,
+    ordersPlaced: store.orderLogs.length,
+    consecutiveFailures: store.consecutiveFailures,
+    lastUpdate: new Date().toISOString()
+  });
+});
+
+// Generate Maker orders (mock endpoint for backendService compatibility)
+app.post('/api/volume/maker-orders', (req, res) => {
+  const orders = [
+    {
+      id: `maker-${Math.random().toString(36).substring(2, 8)}`,
+      symbol: 'BTC/USDT',
+      side: 'buy' as const,
+      amount: 0.5,
+      price: store.prices.BTC,
+      cost: store.prices.BTC * 0.5,
+      expectedRebate: (store.prices.BTC * 0.5) * 0.0005
+    },
+    {
+      id: `maker-${Math.random().toString(36).substring(2, 8)}`,
+      symbol: 'ETH/USDT',
+      side: 'buy' as const,
+      amount: 5,
+      price: store.prices.ETH,
+      cost: store.prices.ETH * 5,
+      expectedRebate: (store.prices.ETH * 5) * 0.0005
+    }
+  ];
+  res.json({ orders });
+});
+
+// Record trade endpoint (mock)
+app.post('/api/volume/record-trade', (req, res) => {
+  const { order } = req.body;
+  if (!order) {
+    return res.status(400).json({ error: 'Order data required' });
+  }
+  
+  store.totalVolumeUSD += order.cost || 0;
+  store.totalRebateUSD += order.expectedRebate || 0;
+  
+  res.json({
+    recorded: true,
+    cumulativeMetrics: {
+      totalVolume: store.totalVolumeUSD,
+      totalRebate: store.totalRebateUSD,
+      ordersCount: store.orderLogs.length
+    }
+  });
+});
+
+// Get market prices (mock endpoint for backendService compatibility)
+app.get('/api/market/prices', (req, res) => {
+  const symbols = (req.query.symbols as string)?.split(',') || ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT', 'LINK/USDT'];
+  
+  const prices: Record<string, any> = {};
+  symbols.forEach(symbol => {
+    const asset = symbol.split('/')[0] as AssetSymbol;
+    if (asset in store.prices) {
+      prices[symbol] = {
+        symbol,
+        price: store.prices[asset],
+        timestamp: new Date().toISOString()
+      };
+    }
+  });
+  
+  res.json({ data: prices, status: 'success' });
+});
+
+// Get order book (mock endpoint for backendService compatibility)
+app.get('/api/orderbook/:symbol', (req, res) => {
+  const { symbol } = req.params;
+  const limit = parseInt(req.query.limit as string) || 20;
+  
+  const [asset] = symbol.split('/');
+  const price = store.prices[asset as AssetSymbol] || 100;
+  
+  const bids = [];
+  const asks = [];
+  
+  for (let i = 0; i < limit; i++) {
+    const bidPrice = price * (1 - (i * 0.0001));
+    const askPrice = price * (1 + (i * 0.0001));
+    bids.push([bidPrice, Math.random() * 10]);
+    asks.push([askPrice, Math.random() * 10]);
+  }
+  
+  res.json({
+    symbol,
+    bids: bids.slice(0, limit),
+    asks: asks.slice(0, limit),
+    timestamp: new Date().toISOString(),
+    datetime: new Date().toISOString()
   });
 });
 
@@ -377,14 +501,50 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    let indexHtmlContent: string = '';
+
+    // Read index.html at startup
+    try {
+      const fs = require('fs');
+      indexHtmlContent = fs.readFileSync(path.join(distPath, 'index.html'), 'utf-8');
+    } catch (err) {
+      console.warn('[Warning] Could not read dist/index.html');
+      indexHtmlContent = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZERO-TRUST REBATE & VOLUME ENGINE</title>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>`;
+    }
+
+    // Serve static files with proper charset headers
+    app.use(express.static(distPath, {
+      setHeaders: (res, filepath) => {
+        if (filepath.endsWith('.html')) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        } else if (filepath.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        } else if (filepath.endsWith('.json')) {
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        }
+      }
+    }));
+    // Fallback to index.html for SPA routing (catch all remaining requests)
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(indexHtmlContent);
     });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Production Server] Server listening on http://0.0.0.0:${PORT}`);
+    console.log(`[Server] Listening on http://0.0.0.0:${PORT}`);
+    console.log(`[Environment] NODE_ENV=${process.env.NODE_ENV || 'development'}`);
+    console.log(`[API Routes] Ready: /api/stats, /api/volume/metrics, /api/public-feed, /api/ccxt/trade, /api/ccxt/balance, /health`);
   });
 }
 
