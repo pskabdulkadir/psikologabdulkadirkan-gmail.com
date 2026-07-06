@@ -206,6 +206,22 @@ export default function App() {
     }
   }, [lastFetchedPrices]);
 
+  // Manual refresh handler
+  const handleManualRefresh = async () => {
+    setPublicFeedStatus('FETCHING');
+    try {
+      const result = await fetchPublicMarketData(engineConfig.selectedAssets);
+      if (result) {
+        setLastFetchedPrices(result);
+        setPublicFeedStatus('LIVE');
+      } else {
+        setPublicFeedStatus('ERROR');
+      }
+    } catch (err) {
+      setPublicFeedStatus('ERROR');
+    }
+  };
+
   // Sync UI key updates dynamically to RuntimeAuthService (RAM only)
   useEffect(() => {
     if (engineConfig.apiKeys) {
@@ -216,7 +232,7 @@ export default function App() {
     }
   }, [engineConfig.apiKeys]);
 
-  // Public Credential-Free Feed fetching task
+  // Public Credential-Free Feed fetching task - Initial load only
   useEffect(() => {
     if (!usePublicFeed) {
       setPublicFeedStatus('IDLE');
@@ -229,6 +245,7 @@ export default function App() {
       if (!isMounted) return;
 
       try {
+        setPublicFeedStatus('FETCHING');
         const result = await fetchPublicMarketData(engineConfig.selectedAssets);
         if (!isMounted) return;
 
@@ -245,17 +262,13 @@ export default function App() {
       }
     };
 
-    // Initial fetch
+    // Initial fetch only - no periodic refresh to avoid DOM thrashing
     fetchPrices();
-
-    // Periodic refresh every 30s (increased from 15s to reduce DOM thrashing)
-    const interval = setInterval(fetchPrices, 30000);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
-  }, [usePublicFeed, engineConfig.selectedAssets]);
+  }, [usePublicFeed]);
 
   const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret' | 'passphrase', value: string) => {
     setEngineConfig(prev => {
@@ -932,26 +945,36 @@ export default function App() {
                   Binance Public API & CoinGecko sunucularına doğrudan (anahtarsız) bağlanarak gerçek zamanlı kripto para fiyatlarını çeker.
                 </p>
               </div>
-              <div className="mt-4 pt-2 border-t border-gray-900/40 flex items-center justify-between font-mono text-[10px]">
-                <span className="text-gray-400">Bağlantı Durumu:</span>
-                {publicFeedStatus === 'LIVE' ? (
-                  <span className="text-emerald-400 font-bold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-                    CANLI (GERÇEK VERİ AKTİF)
-                  </span>
-                ) : publicFeedStatus === 'FETCHING' ? (
-                  <span className="text-amber-400 flex items-center gap-1 animate-pulse">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    VERİLER ÇEKİLİYOR...
-                  </span>
-                ) : publicFeedStatus === 'ERROR' ? (
-                  <span className="text-red-400 font-bold flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
-                    BAĞLANTI SINIRI (SİMÜLASYON AKTİF)
-                  </span>
-                ) : (
-                  <span className="text-gray-500 font-bold">KAPALI (BROWNIAN SIMULATION)</span>
-                )}
+              <div className="mt-4 pt-2 border-t border-gray-900/40 space-y-2">
+                <div className="flex items-center justify-between font-mono text-[10px]">
+                  <span className="text-gray-400">Bağlantı Durumu:</span>
+                  {publicFeedStatus === 'LIVE' ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                      CANLI (GERÇEK VERİ AKTİF)
+                    </span>
+                  ) : publicFeedStatus === 'FETCHING' ? (
+                    <span className="text-amber-400 flex items-center gap-1 animate-pulse">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      VERİLER ÇEKİLİYOR...
+                    </span>
+                  ) : publicFeedStatus === 'ERROR' ? (
+                    <span className="text-red-400 font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      BAĞLANTI HATASI
+                    </span>
+                  ) : (
+                    <span className="text-gray-500 font-bold">KAPALI</span>
+                  )}
+                </div>
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={publicFeedStatus === 'FETCHING'}
+                  className="w-full px-2 py-1 bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-mono transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  VERİLERİ YENİLE
+                </button>
               </div>
             </div>
 
