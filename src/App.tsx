@@ -199,16 +199,16 @@ export default function App() {
   const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
   const hasInitialFetch = useRef(false);
 
-  // Update market prices when live feed data arrives - with delay to prevent DOM thrashing
+  // Update market prices when live feed data arrives - with large delay to prevent DOM thrashing
   useEffect(() => {
     if (!lastFetchedPrices) return;
 
     console.log('[UI] Updating market prices with:', lastFetchedPrices);
 
-    // Delay update to prevent rapid DOM re-renders from crashing
+    // Large delay (500ms) to let React finish all updates before DOM manipulation
     const timer = setTimeout(() => {
       setMarketPrices(prevPrices => generateMarketPrices(0, prevPrices, lastFetchedPrices));
-    }, 100);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [lastFetchedPrices]);
