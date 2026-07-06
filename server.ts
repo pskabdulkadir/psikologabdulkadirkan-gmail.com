@@ -383,9 +383,19 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    // Serve static files first
-    app.use(express.static(distPath));
-    // Fallback to index.html for SPA routing (but NOT for API routes)
+    // Serve static files
+    app.use(express.static(distPath, {
+      setHeaders: (res, path) => {
+        if (path.endsWith('.html')) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+      }
+    }));
+    // 404 for unmatched API routes (don't serve index.html for API requests)
+    app.use('/api', (req, res) => {
+      res.status(404).json({ error: 'API route not found', path: req.path });
+    });
+    // Fallback to index.html for SPA routing (catch all remaining requests)
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
