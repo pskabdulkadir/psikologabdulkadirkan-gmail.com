@@ -229,24 +229,22 @@ export default function App() {
     }
   };
 
-  // Clear only TEST data - preserve real transactions
+  // Clear only TEST data - PRESERVE profit and rebate earnings
   const handleClearAllData = () => {
-    if (confirm('SADECE TEST VERİLERİNİ SİL? (Gerçek işlemler korunacak)')) {
-      // Remove only test/demo data
+    if (confirm('SADECE TEST VERİLERİNİ SİL? (Kâr ve rebate korunacak)')) {
+      // Remove only test/demo data - DO NOT touch profit/earnings
       const keysToRemove = [
         'secure_order_logs',
         'secure_withdrawal_logs',
-        'secure_accumulated_profit',
         'secure_total_withdrawn',
         'secure_total_trades',
-        'secure_rebate_earned',
         'secure_balances'
       ];
 
       keysToRemove.forEach(key => localStorage.removeItem(key));
 
-      console.log('[CLEANUP] Test data cleared. Real transactions preserved.');
-      alert('Test verileri silindi. Gerçek işlemler güvenli tutuldu.');
+      console.log('[CLEANUP] Test data cleared. Profits and earnings preserved.');
+      alert('Test verileri silindi. Kazanılan para ve rebate korundu.');
       window.location.reload();
     }
   };
