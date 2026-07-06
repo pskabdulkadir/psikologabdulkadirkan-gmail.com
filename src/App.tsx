@@ -283,8 +283,8 @@ export default function App() {
     // Initial fetch
     fetchPrices();
 
-    // Auto-refresh every 5 seconds
-    const interval = setInterval(fetchPrices, 5000);
+    // Auto-refresh every 1 second
+    const interval = setInterval(fetchPrices, 1000);
 
     return () => {
       isMounted = false;
