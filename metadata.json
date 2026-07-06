@@ -1,0 +1,6 @@
+{
+  "name": "Zero-Trust Arbitrage Engine",
+  "description": "Merkezi borsalar arasında sıfır kütüphane bağımlılığı ve tam izole mimari ile çalışan borsa içi arbitraj motoru.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
