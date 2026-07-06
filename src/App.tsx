@@ -123,23 +123,27 @@ export default function App() {
   useEffect(() => {
     if (!engineConfig.isRunning || engineConfig.isShutdown) return;
 
+    let tickCounter = 0;
     const interval = setInterval(() => {
       setTimeSeconds(prev => prev + 1);
+      tickCounter++;
 
-      // Generate new market prices every 3 seconds
-      if (Math.random() > 0.65) {
-        setMarketPrices(generateMarketPrices(timeSeconds, null));
+      // Generate new market prices every 3 ticks
+      if (tickCounter % 3 === 0) {
+        setMarketPrices(prev => generateMarketPrices(tickCounter, prev));
       }
 
-      // Scan for opportunities every 2 seconds
-      setOpportunities(prev => {
-        const newOpportunities = scanOpportunities(marketPrices, engineConfig.minArbitrageBuffer);
-        return newOpportunities.length > 0 ? newOpportunities : prev;
-      });
+      // Scan for opportunities every 2 ticks
+      if (tickCounter % 2 === 0) {
+        setOpportunities(prev => {
+          const newOpportunities = scanOpportunities(marketPrices, engineConfig.minArbitrageBuffer);
+          return newOpportunities.length > 0 ? newOpportunities : prev;
+        });
+      }
 
-      // Create network logs for monitoring
-      if (Math.random() > 0.88) {
-        setNetworkLogs(prev => [createNetworkLog(), ...prev.slice(0, 49)]);
+      // Create network logs for monitoring - very rarely
+      if (tickCounter % 8 === 0 && Math.random() > 0.5) {
+        setNetworkLogs(prev => [createNetworkLog(), ...prev.slice(0, 19)]);
       }
 
       // Check profit lock
@@ -154,7 +158,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [engineConfig, accumulatedProfitUSD, timeSeconds, marketPrices]);
+  }, [engineConfig, accumulatedProfitUSD, marketPrices]);
 
   // Handlers
   const toggleEngine = () => {
@@ -727,7 +731,7 @@ export default function App() {
                         Henüz otomatik veya manuel bir bakiye çekim işlemi gerçekleşmedi. FALE modu aktifken belirlenen kâr eşiği geçildiğinde otomatik tetiklenir.
                       </div>
                     ) : (
-                      withdrawalLogs.map((log) => (
+                      withdrawalLogs.slice(0, 10).map((log) => (
                         <div key={log.id} className="bg-gray-900/30 border border-gray-900 p-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -772,7 +776,7 @@ export default function App() {
                         Motor aktifken saptanan arbitrallere yönelik otomatik milisaniyelik emir tetiklemeleri burada listelenecektir.
                       </div>
                     ) : (
-                      orderLogs.map((log) => (
+                      orderLogs.slice(0, 15).map((log) => (
                         <div key={log.id} className="bg-gray-900/20 border border-gray-900 p-2.5 rounded-lg flex items-start sm:items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
                           <div className="flex items-center gap-2">
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
