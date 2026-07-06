@@ -195,7 +195,6 @@ export default function App() {
   const [apiKeysVisible, setApiKeysVisible] = useState<boolean>(false);
   const [settingsSavedMessage, setSettingsSavedMessage] = useState<string>('');
 
-  const [usePublicFeed, setUsePublicFeed] = useState<boolean>(true);
   const [publicFeedStatus, setPublicFeedStatus] = useState<'IDLE' | 'FETCHING' | 'LIVE' | 'ERROR'>('IDLE');
   const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
   const hasInitialFetch = useRef(false);
@@ -262,43 +261,10 @@ export default function App() {
     }
   }, [engineConfig.apiKeys]);
 
-  // Initial fetch - guaranteed to run only once
+  // NO automatic fetch - user must click "VERİLERİ YENİLE" button
+  // This prevents double-fetch crashes and DOM thrashing
   useEffect(() => {
-    if (hasInitialFetch.current) return;
-    hasInitialFetch.current = true;
-
-    let isMounted = true;
-
-    const fetchPrices = async () => {
-      if (!isMounted) return;
-
-      try {
-        setPublicFeedStatus('FETCHING');
-        const result = await fetchPublicMarketData(engineConfig.selectedAssets);
-        if (!isMounted) return;
-
-        if (result) {
-          setLastFetchedPrices(result);
-          setPublicFeedStatus('LIVE');
-        } else {
-          setPublicFeedStatus('ERROR');
-        }
-      } catch (err) {
-        if (isMounted) {
-          setPublicFeedStatus('ERROR');
-        }
-      }
-    };
-
-    if (usePublicFeed) {
-      fetchPrices();
-    } else {
-      setPublicFeedStatus('IDLE');
-    }
-
-    return () => {
-      isMounted = false;
-    };
+    setPublicFeedStatus('IDLE');
   }, []); // Empty dependencies - fetch only once on mount
 
   const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret' | 'passphrase', value: string) => {
