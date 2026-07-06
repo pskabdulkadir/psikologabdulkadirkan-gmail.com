@@ -69,9 +69,9 @@ export default function ZeroTrustContract() {
           <div>
             <h4 className="text-sm font-semibold text-amber-400 mb-1 font-mono">MİMARİ GÜVENLİK AKDİ (MANDATORY INSTRUCTION)</h4>
             <p className="text-xs text-amber-200/90 leading-relaxed font-sans">
-              "Bu projede hızdan veya kolaylıktan ziyade, kodun benim tam hakimiyetimde olması esastır. 
+              Bu projede hızdan veya kolaylıktan ziyade, kodun benim tam hakimiyetimde olması esastır. 
               Harici hiçbir paket kabul etmiyorum. Eğer kodun içine benden habersiz bir 'import' satırı veya dış bağlantı 
-              eklersen, sistemin çalışma prensibini bozar ve hukuki sorumluluk doğurur. Kuralları kabul ediyorsan başlayalım."
+              eklersen, sistemin çalışma prensibini bozar ve hukuki sorumluluk doğurur. Kuralları kabul ediyorsan başlayalım.
             </p>
           </div>
         </div>
@@ -170,7 +170,7 @@ const triggerAutonomousWithdrawal = (amountToWithdraw: number) => {
       '0 bytes'
     );
     setNetworkLogs((prev) => [failLog, ...prev]);
-    alert('GÜVENLİK ALARMI: Cüzdan adresi tanımlı değil! Kasa çekimi yapılamadığı için bot sistemi kendini acil durum kilidine (Shutdown) aldı ve işlemleri tamamen durdurdu. Lütfen Beyaz Liste panelinden cüzdan adresinizi ekleyiniz.');
+    alert('Güvenlik Alarmı: Cüzdan adresi tanımlı değil! Kasa çekimi yapılamadığı için bot sistemi kendini acil durum kilidine (Shutdown) aldı ve işlemleri tamamen durdurdu. Lütfen Beyaz Liste panelinden cüzdan adresinizi ekleyiniz.');
     return;
   }
 
