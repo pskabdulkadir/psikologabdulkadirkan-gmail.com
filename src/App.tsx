@@ -199,19 +199,10 @@ export default function App() {
   const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
   const hasInitialFetch = useRef(false);
 
-  // Update market prices when live feed data arrives - with extra delay to prevent DOM thrashing
-  useEffect(() => {
-    if (!lastFetchedPrices) return;
-
-    console.log('[UI] Updating market prices with:', lastFetchedPrices);
-
-    // Large delay (1000ms) to prevent rapid DOM re-renders from crashing
-    const timer = setTimeout(() => {
-      setMarketPrices(prevPrices => generateMarketPrices(0, prevPrices, lastFetchedPrices));
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [lastFetchedPrices]);
+  // Compute market prices directly from lastFetchedPrices (no state update = no crash)
+  const computedMarketPrices = lastFetchedPrices
+    ? generateMarketPrices(0, marketPrices, lastFetchedPrices)
+    : marketPrices;
 
   // Manual refresh handler
   const handleManualRefresh = async () => {
@@ -1003,7 +994,7 @@ export default function App() {
             {/* Right side: Analytics Engine */}
             <div className="bg-black/40 border border-gray-900 rounded-lg p-4 font-mono text-xs flex flex-col justify-between">
               {(() => {
-                const analytics = runOrderbookAnalytics(marketPrices, engineConfig.selectedAssets, engineConfig.tradeSizeUSD);
+                const analytics = runOrderbookAnalytics(computedMarketPrices, engineConfig.selectedAssets, engineConfig.tradeSizeUSD);
                 return (
                   <>
                     <div className="flex justify-between items-center mb-2">
@@ -1360,7 +1351,7 @@ export default function App() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
                     {EXCHANGES.map((exch) => {
-                      const data = marketPrices[exch.id]?.[selectedMonitoringAsset];
+                      const data = computedMarketPrices[exch.id]?.[selectedMonitoringAsset];
                       return (
                         <div key={exch.id} className="bg-gray-900/20 border border-gray-900 p-3 rounded-lg space-y-2">
                           <div className="flex items-center justify-between border-b border-gray-900 pb-2">
