@@ -58,28 +58,15 @@ export function generateLocalHash(input: string): string {
 // Generate organic market prices with independent Brownian fluctuation per exchange
 export function generateMarketPrices(
   timeSeconds: number,
-<<<<<<< HEAD
-  prevData: Record<string, ExchangeMarketData> | null,
-  customBasePrices?: Record<AssetSymbol, number> | null
-): Record<string, ExchangeMarketData> {
-  const data: Record<string, ExchangeMarketData> = {};
-  const activeBases = customBasePrices || BASE_PRICES;
-=======
   prevData: Record<string, ExchangeMarketData> | null
 ): Record<string, ExchangeMarketData> {
   const data: Record<string, ExchangeMarketData> = {};
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
 
   EXCHANGES.forEach((exchange) => {
     data[exchange.id] = {};
-    
-<<<<<<< HEAD
-    (Object.keys(activeBases) as AssetSymbol[]).forEach((asset) => {
-      const base = activeBases[asset] || BASE_PRICES[asset];
-=======
+
     (Object.keys(BASE_PRICES) as AssetSymbol[]).forEach((asset) => {
       const base = BASE_PRICES[asset];
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
       
       // Use different frequencies and amplitudes per exchange to create organic deviations
       const seed = exchange.id === 'binance' ? 1.0 : exchange.id === 'okx' ? 1.4 : 1.9;
