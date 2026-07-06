@@ -261,10 +261,42 @@ export default function App() {
     }
   }, [engineConfig.apiKeys]);
 
-  // NO automatic fetch - user must click "VERİLERİ YENİLE" button
-  // This prevents double-fetch crashes and DOM thrashing
+  // Auto-fetch on mount and every 60 seconds
   useEffect(() => {
-    setPublicFeedStatus('IDLE');
+    let isMounted = true;
+    let fetchTimer: NodeJS.Timeout;
+
+    const fetchPrices = async () => {
+      if (!isMounted) return;
+
+      try {
+        setPublicFeedStatus('FETCHING');
+        const result = await fetchPublicMarketData(engineConfig.selectedAssets);
+        if (!isMounted) return;
+
+        if (result) {
+          setLastFetchedPrices(result);
+          setPublicFeedStatus('LIVE');
+        } else {
+          setPublicFeedStatus('ERROR');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setPublicFeedStatus('ERROR');
+        }
+      }
+    };
+
+    // Initial fetch
+    fetchPrices();
+
+    // Refresh every 60 seconds
+    fetchTimer = setInterval(fetchPrices, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(fetchTimer);
+    };
   }, []); // Empty dependencies - fetch only once on mount
 
   const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret' | 'passphrase', value: string) => {
