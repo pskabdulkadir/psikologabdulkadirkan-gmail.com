@@ -6,11 +6,9 @@ import ccxt from 'ccxt';
 const app = express();
 app.use(express.json());
 
-// Set charset for all HTML responses
-app.use((req, res, next) => {
-  if (!res.getHeader('Content-Type')) {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  }
+// Middleware to ensure JSON APIs return proper content-type
+app.use('/api/', (req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   next();
 });
 
@@ -385,12 +383,10 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    // Serve static files first
     app.use(express.static(distPath));
+    // Fallback to index.html for SPA routing (but NOT for API routes)
     app.get('*', (req, res) => {
-      // Serve index.html for all non-API routes (SPA routing)
-      if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: 'API route not found' });
-      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
