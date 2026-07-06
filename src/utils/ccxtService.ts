@@ -99,19 +99,25 @@ export const RuntimeAuthService = new RuntimeKeyManager();
 // If API fails or is rate-limited, returns NULL (no fake data)
 export async function fetchPublicMarketData(assets: AssetSymbol[]): Promise<Record<AssetSymbol, number> | null> {
   try {
+    console.log('[API] Fetching live prices from Binance...');
+
     const response = await fetch('https://api.binance.com/api/v3/ticker/price', {
       method: 'GET',
       headers: { 'Accept': 'application/json' }
     });
-    
+
+    console.log(`[API] Binance response status: ${response.status}`);
+
     if (!response.ok) {
-      console.error(`Binance API Error: ${response.status}`);
+      console.error(`[API] Binance API Error: ${response.status} ${response.statusText}`);
       return null;
     }
 
     const rawData = await response.json();
+    console.log(`[API] Received ${Array.isArray(rawData) ? rawData.length : '?'} price records`);
+
     if (!Array.isArray(rawData)) {
-      console.error('Invalid Binance API response format');
+      console.error('[API] Invalid Binance API response format - not an array');
       return null;
     }
 
@@ -131,15 +137,18 @@ export async function fetchPublicMarketData(assets: AssetSymbol[]): Promise<Reco
       }
     });
 
+    console.log('[API] Parsed prices:', prices);
+
     // Only return if we have valid data for all required assets
     if (prices.BTC && prices.ETH && prices.SOL && prices.AVAX && prices.LINK) {
+      console.log('[API] ✓ All required prices fetched successfully');
       return prices as Record<AssetSymbol, number>;
     }
-    
-    console.warn('Incomplete price data from Binance API');
+
+    console.warn('[API] ✗ Incomplete price data from Binance API:', prices);
     return null;
   } catch (error) {
-    console.error('Binance Public Data Fetch Failed:', error);
+    console.error('[API] Binance Public Data Fetch Failed:', error);
     return null;
   }
 }

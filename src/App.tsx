@@ -201,6 +201,7 @@ export default function App() {
   // Update market prices when live feed data arrives
   useEffect(() => {
     if (lastFetchedPrices) {
+      console.log('[UI] Updating market prices with:', lastFetchedPrices);
       setMarketPrices(prevPrices => generateMarketPrices(0, prevPrices, lastFetchedPrices));
     }
   }, [lastFetchedPrices]);
