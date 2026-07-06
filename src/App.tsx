@@ -222,10 +222,24 @@ export default function App() {
     }
   };
 
-  // Clear all localStorage test data
+  // Clear only TEST data - preserve real transactions
   const handleClearAllData = () => {
-    if (confirm('TÜM TEST VERİLERİNİ SİL? (localStorage temizlenecek)')) {
-      localStorage.clear();
+    if (confirm('SADECE TEST VERİLERİNİ SİL? (Gerçek işlemler korunacak)')) {
+      // Remove only test/demo data
+      const keysToRemove = [
+        'secure_order_logs',
+        'secure_withdrawal_logs',
+        'secure_accumulated_profit',
+        'secure_total_withdrawn',
+        'secure_total_trades',
+        'secure_rebate_earned',
+        'secure_balances'
+      ];
+
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+
+      console.log('[CLEANUP] Test data cleared. Real transactions preserved.');
+      alert('Test verileri silindi. Gerçek işlemler güvenli tutuldu.');
       window.location.reload();
     }
   };
@@ -1696,7 +1710,7 @@ export default function App() {
                         onClick={handleClearAllData}
                         className="w-full bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-500/30 text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
                       >
-                        ⚠️ TÜM TEST VERİLERİNİ SİL (localStorage)
+                        🗑️ TEST VERİLERİNİ SİL (Gerçek işlemler korunur)
                       </button>
                     </div>
                   )}
