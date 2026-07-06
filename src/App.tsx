@@ -12,11 +12,6 @@ import {
   EXCHANGES, BASE_PRICES, generateMarketPrices, scanOpportunities,
   createNetworkLog, INITIAL_BALANCES, generateLocalHash
 } from './utils/engineSimulator';
-<<<<<<< HEAD
-import ccxt from 'ccxt';
-import { RuntimeAuthService, fetchPublicMarketData, runOrderbookAnalytics } from './utils/ccxtService';
-=======
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
 import ZeroTrustContract from './components/ZeroTrustContract';
 import NetworkTrafficLogs from './components/NetworkTrafficLogs';
 import BinaryCompilerView from './components/BinaryCompilerView';
@@ -49,1312 +44,322 @@ export default function App() {
     return {
       isRunning: false,
       engineMode: 'HFL_BOT', // Default is HFL Mode
-<<<<<<< HEAD
       systemEnvironment: 'SIMULATION_DEMO',
-=======
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-      minArbitrageBuffer: 0.01, // 0.01% standard limit requested
-      tradeSizeUSD: 5000.00, // standard virtual order sizing
-      selectedAssets: ['BTC', 'ETH', 'SOL', 'AVAX', 'LINK'],
-      profitLockThresholdUSD: 10.00, // HFL mode: triggers manual pause (Simulated lower for easy testing)
-      autoWithdrawThresholdUSD: 5.00, // FALE mode: auto triggers withdraw (Simulated lower for easy testing)
-      whitelistedWallet: localStorage.getItem('secure_whitelisted_wallet') || '', // Dynamic secure config loading
+      selectedAssets: ['BTC', 'ETH', 'SOL'],
+      minArbitrageBuffer: 0.01,
+      tradeSizeUSD: 5000,
+      profitLockThresholdUSD: 10,
+      autoWithdrawThresholdUSD: 5,
+      whitelistedWallet: localStorage.getItem('secure_whitelisted_wallet') || '',
       isShutdown: false,
       consecutiveFailures: 0,
       apiKeys: {
-        binance: { apiKey: 'bin_f8a92e104b2b', apiSecret: 'bin_sec_9302bf71e0c', passphrase: '' },
-        okx: { apiKey: 'okx_cf29e01140df', apiSecret: 'okx_sec_728b9d0ea13', passphrase: 'LocalPassphraseSecure' },
-        coinbase: { apiKey: 'cb_pro_103fa0e902b', apiSecret: 'cb_sec_40a20e2e9d1', passphrase: '' }
+        binance: { apiKey: '', apiSecret: '' },
+        okx: { apiKey: '', apiSecret: '' },
+        coinbase: { apiKey: '', apiSecret: '' }
       }
     };
   });
 
-  // Simulator Data States
-  const [marketPrices, setMarketPrices] = useState<Record<string, ExchangeMarketData>>(
-    generateMarketPrices(0, null)
-  );
+  // Market Data State
+  const [marketPrices, setMarketPrices] = useState<{ [key: string]: { [key: string]: ExchangeMarketData } }>(() => {
+    return generateMarketPrices();
+  });
+
+  // Opportunities State
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
-  
-  const [orderLogs, setOrderLogs] = useState<OrderLog[]>(() => {
-    const saved = localStorage.getItem('secure_order_logs');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return [];
-  });
 
+  // Balances State
+  const [balances, setBalances] = useState<ExchangeBalances>(INITIAL_BALANCES);
+
+  // Order Logs State
+  const [orderLogs, setOrderLogs] = useState<OrderLog[]>([]);
+
+  // Network Logs State
   const [networkLogs, setNetworkLogs] = useState<NetworkConnectionLog[]>([]);
-  
-  const [balances, setBalances] = useState<ExchangeBalances>(() => {
-    const saved = localStorage.getItem('secure_balances');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return INITIAL_BALANCES;
-  });
 
-  const [withdrawalLogs, setWithdrawalLogs] = useState<WithdrawalLog[]>(() => {
-    const saved = localStorage.getItem('secure_withdrawal_logs');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return [];
-  });
+  // Withdrawal Logs
+  const [withdrawalLogs, setWithdrawalLogs] = useState<WithdrawalLog[]>([]);
 
-  // Stats Counters
-  const [totalTradesExecuted, setTotalTradesExecuted] = useState<number>(() => {
-    const saved = localStorage.getItem('secure_total_trades');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-
-  const [accumulatedProfitUSD, setAccumulatedProfitUSD] = useState<number>(() => {
-    const saved = localStorage.getItem('secure_accumulated_profit');
-    return saved ? parseFloat(saved) : 0;
-  });
-
-  const [totalWithdrawnUSD, setTotalWithdrawnUSD] = useState<number>(() => {
-    const saved = localStorage.getItem('secure_total_withdrawn');
-    return saved ? parseFloat(saved) : 0;
-  });
-
-  const [rebateEarnedUSD, setRebateEarnedUSD] = useState<number>(() => {
-    const saved = localStorage.getItem('secure_rebate_earned');
-<<<<<<< HEAD
-    return saved ? parseFloat(saved) : 10.00; // Default $10.00 activation bonus as requested for rebate verification
-  });
-
-  const [referralIds, setReferralIds] = useState<{ binance: string; okx: string; coinbase: string }>(() => {
-    const saved = localStorage.getItem('secure_referral_ids');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
-    return { binance: 'REF_B_82941', okx: 'REF_O_10394', coinbase: 'REF_C_22019' };
-  });
-
-  useEffect(() => {
-    localStorage.setItem('secure_referral_ids', JSON.stringify(referralIds));
-  }, [referralIds]);
-
-=======
-    return saved ? parseFloat(saved) : 0;
-  });
-
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-  const [totalBytesExchanged, setTotalBytesExchanged] = useState<number>(31240); // seed bytes
-  const [selectedMonitoringAsset, setSelectedMonitoringAsset] = useState<AssetSymbol>('BTC');
-
-  // Input states for settings edit
-  const [tempBuffer, setTempBuffer] = useState<string>(() => {
-    const saved = localStorage.getItem('secure_engine_config');
-    if (saved) {
-      try { return JSON.parse(saved).minArbitrageBuffer.toString(); } catch (e) {}
-    }
-    return '0.01';
-  });
-
-  const [tempTradeSize, setTempTradeSize] = useState<string>(() => {
-    const saved = localStorage.getItem('secure_engine_config');
-    if (saved) {
-      try { return JSON.parse(saved).tradeSizeUSD.toString(); } catch (e) {}
-    }
-    return '5000';
-  });
-
-  const [tempProfitLock, setTempProfitLock] = useState<string>(() => {
-    const saved = localStorage.getItem('secure_engine_config');
-    if (saved) {
-      try { return JSON.parse(saved).profitLockThresholdUSD.toString(); } catch (e) {}
-    }
-    return '10.00';
-  });
-
-  const [tempAutoWithdraw, setTempAutoWithdraw] = useState<string>(() => {
-    const saved = localStorage.getItem('secure_engine_config');
-    if (saved) {
-      try { return JSON.parse(saved).autoWithdrawThresholdUSD.toString(); } catch (e) {}
-    }
-    return '5.00';
-  });
-
-  const [tempWallet, setTempWallet] = useState<string>(localStorage.getItem('secure_whitelisted_wallet') || '');
-  const [walletSavedMessage, setWalletSavedMessage] = useState<string>('');
+  // UI States
+  const [isProfitLocked, setIsProfitLocked] = useState<boolean>(false);
   const [apiKeysVisible, setApiKeysVisible] = useState<boolean>(false);
+  const [selectedMonitoringAsset, setSelectedMonitoringAsset] = useState<AssetSymbol>('BTC');
   const [settingsSavedMessage, setSettingsSavedMessage] = useState<string>('');
+  const [walletSavedMessage, setWalletSavedMessage] = useState<string>('');
 
-<<<<<<< HEAD
-  const [usePublicFeed, setUsePublicFeed] = useState<boolean>(true);
-  const [publicFeedStatus, setPublicFeedStatus] = useState<'IDLE' | 'FETCHING' | 'LIVE' | 'ERROR'>('IDLE');
-  const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
+  // Temp form states
+  const [tempBuffer, setTempBuffer] = useState(engineConfig.minArbitrageBuffer.toString());
+  const [tempTradeSize, setTempTradeSize] = useState(engineConfig.tradeSizeUSD.toString());
+  const [tempProfitLock, setTempProfitLock] = useState(engineConfig.profitLockThresholdUSD.toString());
+  const [tempAutoWithdraw, setTempAutoWithdraw] = useState(engineConfig.autoWithdrawThresholdUSD.toString());
+  const [tempWallet, setTempWallet] = useState(engineConfig.whitelistedWallet);
 
-  // Sync UI key updates dynamically to RuntimeAuthService (RAM only)
+  // Calculate totals
+  const sums = {
+    totalUsdt: Object.values(balances).reduce((sum, bal) => sum + (bal.USDT || 0), 0),
+    totalBtc: Object.values(balances).reduce((sum, bal) => sum + (bal.BTC || 0), 0),
+    totalEth: Object.values(balances).reduce((sum, bal) => sum + (bal.ETH || 0), 0),
+    totalSol: Object.values(balances).reduce((sum, bal) => sum + (bal.SOL || 0), 0),
+  };
+
+  // Calculate accumulated profit
+  const accumulatedProfitUSD = orderLogs
+    .filter(log => log.status === 'FILLED')
+    .reduce((sum, log) => {
+      if (log.type === 'BUY') return sum - (log.quantity * log.price);
+      return sum + (log.quantity * log.price);
+    }, 0);
+
+  // Calculate total withdrawn
+  const totalWithdrawnUSD = withdrawalLogs.reduce((sum, log) => sum + log.amount, 0);
+
+  // Calculate rebate earned
+  const rebateEarnedUSD = orderLogs
+    .filter(log => log.status === 'FILLED')
+    .reduce((sum, log) => sum + (log.quantity * log.price * 0.0001), 0);
+
+  // Main Engine Loop
   useEffect(() => {
-    if (engineConfig.apiKeys) {
-      Object.keys(engineConfig.apiKeys).forEach(exchangeId => {
-        const keys = engineConfig.apiKeys[exchangeId];
-        RuntimeAuthService.setKeys(exchangeId, keys.apiKey, keys.apiSecret, keys.passphrase);
-      });
-    }
-  }, [engineConfig.apiKeys]);
+    if (!engineConfig.isRunning || engineConfig.isShutdown) return;
 
-  // Public Credential-Free Feed fetching task
-  useEffect(() => {
-    if (!usePublicFeed) {
-      setPublicFeedStatus('IDLE');
+    const interval = setInterval(() => {
+      setTimeSeconds(prev => prev + 1);
+
+      // Generate new market prices every 2 seconds
+      if (Math.random() > 0.7) {
+        setMarketPrices(generateMarketPrices());
+      }
+
+      // Scan for opportunities
+      const newOpportunities = scanOpportunities(marketPrices, engineConfig.minArbitrageBuffer);
+      setOpportunities(newOpportunities);
+
+      // Create network logs for monitoring
+      if (Math.random() > 0.85) {
+        setNetworkLogs(prev => [createNetworkLog(), ...prev.slice(0, 49)]);
+      }
+
+      // Check profit lock
+      if (engineConfig.engineMode === 'HFL_BOT' && accumulatedProfitUSD >= engineConfig.profitLockThresholdUSD) {
+        setIsProfitLocked(true);
+      }
+
+      // Auto-withdraw in FALE mode
+      if (engineConfig.engineMode === 'FALE' && accumulatedProfitUSD >= engineConfig.autoWithdrawThresholdUSD) {
+        triggerAutonomousWithdrawal(accumulatedProfitUSD);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [engineConfig, accumulatedProfitUSD]);
+
+  // Handlers
+  const toggleEngine = () => {
+    if (engineConfig.isShutdown) {
+      alert('تم إيقاف المحرك في حالة الطوارئ! يجب إعادة تعيين أولاً.');
       return;
     }
-    
-    const fetchPrices = async () => {
-      setPublicFeedStatus('FETCHING');
-      try {
-        const result = await fetchPublicMarketData(engineConfig.selectedAssets);
-        if (result) {
-          setLastFetchedPrices(result);
-          setPublicFeedStatus('LIVE');
-        } else {
-          setPublicFeedStatus('ERROR');
-        }
-      } catch (err) {
-        setPublicFeedStatus('ERROR');
-      }
+    if (!engineConfig.whitelistedWallet) {
+      alert('يرجى تعيين عنوان المحفظة البيضاء أولاً!');
+      return;
+    }
+    setEngineConfig(prev => ({ ...prev, isRunning: !prev.isRunning }));
+  };
+
+  const triggerSimulatedOrderFailure = () => {
+    const newConsecutiveFailures = engineConfig.consecutiveFailures + 1;
+    if (newConsecutiveFailures >= 3) {
+      setEngineConfig(prev => ({ ...prev, isShutdown: true, isRunning: false }));
+      alert('تم تنشيط إيقاف الطوارئ! تم تنفيذ 3 أوامر متتالية فاشلة.');
+    } else {
+      setEngineConfig(prev => ({ ...prev, consecutiveFailures: newConsecutiveFailures }));
+      const newLog: OrderLog = {
+        id: Date.now(),
+        type: 'BUY',
+        asset: engineConfig.selectedAssets[0],
+        exchange: 'binance',
+        price: parseFloat((Math.random() * 10000).toFixed(2)),
+        quantity: parseFloat((Math.random() * 0.5).toFixed(4)),
+        latencyUs: Math.floor(Math.random() * 500),
+        status: 'REJECTED',
+        timestamp: Date.now()
+      };
+      setOrderLogs(prev => [newLog, ...prev.slice(0, 99)]);
+    }
+  };
+
+  const resetEmergencyShutdown = () => {
+    setEngineConfig(prev => ({ ...prev, isShutdown: false, consecutiveFailures: 0 }));
+  };
+
+  const handleReleaseProfitLock = () => {
+    setIsProfitLocked(false);
+    setEngineConfig(prev => ({ ...prev, consecutiveFailures: 0 }));
+  };
+
+  const handleResetLedger = () => {
+    setBalances(INITIAL_BALANCES);
+    setOrderLogs([]);
+    setWithdrawalLogs([]);
+  };
+
+  const handleSaveParameters = (e: React.FormEvent) => {
+    e.preventDefault();
+    const config = {
+      ...engineConfig,
+      minArbitrageBuffer: parseFloat(tempBuffer),
+      tradeSizeUSD: parseFloat(tempTradeSize),
+      ...(engineConfig.engineMode === 'HFL_BOT' ? { profitLockThresholdUSD: parseFloat(tempProfitLock) } : { autoWithdrawThresholdUSD: parseFloat(tempAutoWithdraw) })
     };
+    setEngineConfig(config);
+    localStorage.setItem('secure_engine_config', JSON.stringify(config));
+    setSettingsSavedMessage('تم حفظ المعاملات! ⚡');
+    setTimeout(() => setSettingsSavedMessage(''), 2000);
+  };
 
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 15000); // refresh every 15s
-    return () => clearInterval(interval);
-  }, [usePublicFeed, engineConfig.selectedAssets]);
+  const handleSaveWallet = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tempWallet) {
+      alert('أدخل عنوان محفظة صحيح!');
+      return;
+    }
+    setEngineConfig(prev => ({ ...prev, whitelistedWallet: tempWallet }));
+    localStorage.setItem('secure_whitelisted_wallet', tempWallet);
+    setWalletSavedMessage('تم حفظ عنوان المحفظة! ✓');
+    setTimeout(() => setWalletSavedMessage(''), 2000);
+  };
 
-  const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret' | 'passphrase', value: string) => {
-    setEngineConfig(prev => {
-      const updatedKeys = { ...prev.apiKeys };
-      updatedKeys[exchangeId] = {
-        ...updatedKeys[exchangeId],
-        [field]: value
-      };
-      return {
-        ...prev,
-        apiKeys: updatedKeys
-      };
-    });
+  const triggerAutonomousWithdrawal = (amount: number) => {
+    const withdrawal: WithdrawalLog = {
+      id: Date.now(),
+      amount,
+      destination: engineConfig.whitelistedWallet,
+      txHash: 'TX_' + Math.random().toString(36).substring(2, 15),
+      timestamp: Date.now()
+    };
+    setWithdrawalLogs(prev => [withdrawal, ...prev.slice(0, 19)]);
+  };
+
+  const handleUpdateApiKey = (exchangeId: string, field: 'apiKey' | 'apiSecret', value: string) => {
+    setEngineConfig(prev => ({
+      ...prev,
+      apiKeys: {
+        ...prev.apiKeys,
+        [exchangeId]: {
+          ...prev.apiKeys[exchangeId as keyof typeof prev.apiKeys],
+          [field]: value
+        }
+      }
+    }));
   };
 
   const loadOpenSourceTestKeys = () => {
     setEngineConfig(prev => ({
       ...prev,
       apiKeys: {
-        binance: { apiKey: 'bin_testnet_public_ccxt_open_source_key_2026', apiSecret: 'bin_testnet_sec_9941a842fbc9e', passphrase: '' },
-        okx: { apiKey: 'okx_sandbox_public_ccxt_open_source_key_2026', apiSecret: 'okx_sandbox_sec_103fa72bb390c', passphrase: 'LocalSandboxPassphraseSecure' },
-        coinbase: { apiKey: 'cb_sandbox_public_ccxt_open_source_key_2026', apiSecret: 'cb_sandbox_sec_8849eb2c03ef9', passphrase: '' }
+        binance: { apiKey: 'pk_test_binance_public_key_demo_v1', apiSecret: 'sk_test_binance_secret_key_demo_v1' },
+        okx: { apiKey: 'pk_test_okx_public_key_demo_v1', apiSecret: 'sk_test_okx_secret_key_demo_v1' },
+        coinbase: { apiKey: 'pk_test_coinbase_public_key_demo_v1', apiSecret: 'sk_test_coinbase_secret_key_demo_v1' }
       }
     }));
-    setApiKeysVisible(true);
-    setSettingsSavedMessage('Açık kaynak sandbox/testnet API anahtarları otomatik yüklendi!');
-    setTimeout(() => setSettingsSavedMessage(''), 4000);
+    alert('تم تحميل مفاتيح الاختبار المفتوحة المصدر!');
   };
-
-=======
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-  // UI state alerts
-  const [isProfitLocked, setIsProfitLocked] = useState<boolean>(false);
-
-  // 1. Persist stats, config, and logs when they change
-  useEffect(() => {
-    localStorage.setItem('secure_engine_config', JSON.stringify(engineConfig));
-  }, [engineConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('secure_balances', JSON.stringify(balances));
-  }, [balances]);
-
-  useEffect(() => {
-    localStorage.setItem('secure_accumulated_profit', accumulatedProfitUSD.toString());
-  }, [accumulatedProfitUSD]);
-
-  useEffect(() => {
-    localStorage.setItem('secure_total_withdrawn', totalWithdrawnUSD.toString());
-  }, [totalWithdrawnUSD]);
-
-  useEffect(() => {
-    localStorage.setItem('secure_rebate_earned', rebateEarnedUSD.toString());
-  }, [rebateEarnedUSD]);
-
-  useEffect(() => {
-    localStorage.setItem('secure_total_trades', totalTradesExecuted.toString());
-  }, [totalTradesExecuted]);
-
-  useEffect(() => {
-    localStorage.setItem('secure_order_logs', JSON.stringify(orderLogs));
-  }, [orderLogs]);
-
-  useEffect(() => {
-    localStorage.setItem('secure_withdrawal_logs', JSON.stringify(withdrawalLogs));
-  }, [withdrawalLogs]);
-
-  // Keep updating last active timestamp so we can track offline duration
-  useEffect(() => {
-    const activeInterval = setInterval(() => {
-      localStorage.setItem('last_active_timestamp', Date.now().toString());
-    }, 2000);
-    return () => clearInterval(activeInterval);
-  }, []);
-
-  // Calculate offline run on startup
-  useEffect(() => {
-    const savedConfigStr = localStorage.getItem('secure_engine_config');
-    const lastActiveStr = localStorage.getItem('last_active_timestamp');
-    const wallet = localStorage.getItem('secure_whitelisted_wallet') || '';
-
-    if (savedConfigStr && lastActiveStr && wallet.trim()) {
-      try {
-        const savedConfig = JSON.parse(savedConfigStr);
-        if (savedConfig.isRunning && !savedConfig.isShutdown) {
-          const elapsedMs = Date.now() - Number(lastActiveStr);
-          const elapsedSec = Math.floor(elapsedMs / 1000);
-
-          if (elapsedSec >= 15) {
-            // Average: 1 arbitrage cycle every 25 seconds of run time
-            const trades = Math.min(250, Math.floor(elapsedSec / 25));
-            if (trades > 0) {
-              let calculatedProfit = 0;
-              const newOfflineOrders: OrderLog[] = [];
-
-              for (let i = 0; i < trades; i++) {
-                const tradeProfit = Number((0.04 + Math.random() * 0.18).toFixed(4));
-                calculatedProfit += tradeProfit;
-
-                const tradeTime = Date.now() - Math.floor(Math.random() * elapsedMs);
-                const assets: AssetSymbol[] = ['BTC', 'ETH', 'SOL', 'AVAX', 'LINK'];
-                const asset = assets[Math.floor(Math.random() * assets.length)];
-                const buyEx = EXCHANGES[Math.floor(Math.random() * EXCHANGES.length)];
-                const sellEx = EXCHANGES.filter(e => e.id !== buyEx.id)[Math.floor(Math.random() * (EXCHANGES.length - 1))];
-
-                const buyOrderId = `ord-buy-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                const sellOrderId = `ord-sell-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-                newOfflineOrders.push({
-                  id: buyOrderId,
-                  timestamp: tradeTime,
-                  asset,
-                  type: 'BUY',
-                  exchange: buyEx.name,
-                  price: BASE_PRICES[asset],
-                  quantity: Number((savedConfig.tradeSizeUSD / BASE_PRICES[asset]).toFixed(4)),
-                  fee: Number((savedConfig.tradeSizeUSD * buyEx.takerFee).toFixed(4)),
-                  feeAsset: 'USDT',
-                  latencyUs: Math.floor(buyEx.latencyMin + Math.random() * (buyEx.latencyMax - buyEx.latencyMin)),
-                  status: 'COMPLETED',
-                  txHash: generateLocalHash(buyOrderId)
-                });
-
-                newOfflineOrders.push({
-                  id: sellOrderId,
-                  timestamp: tradeTime - 120,
-                  asset,
-                  type: 'SELL',
-                  exchange: sellEx.name,
-                  price: BASE_PRICES[asset] * 1.0003,
-                  quantity: Number((savedConfig.tradeSizeUSD / BASE_PRICES[asset]).toFixed(4)),
-                  fee: Number((savedConfig.tradeSizeUSD * sellEx.takerFee).toFixed(4)),
-                  feeAsset: 'USDT',
-                  latencyUs: Math.floor(sellEx.latencyMin + Math.random() * (sellEx.latencyMax - sellEx.latencyMin)),
-                  status: 'COMPLETED',
-                  txHash: generateLocalHash(sellOrderId)
-                });
-              }
-
-              calculatedProfit = Number(calculatedProfit.toFixed(4));
-
-              // Distribute profits
-              setBalances((prev) => {
-                const updated = JSON.parse(JSON.stringify(prev));
-                updated.binance.USDT = Number((updated.binance.USDT + calculatedProfit / 3).toFixed(2));
-                updated.okx.USDT = Number((updated.okx.USDT + calculatedProfit / 3).toFixed(2));
-                updated.coinbase.USDT = Number((updated.coinbase.USDT + calculatedProfit / 3).toFixed(2));
-                return updated;
-              });
-
-              setOrderLogs((prev) => [...newOfflineOrders, ...prev].slice(0, 40));
-              setTotalTradesExecuted((prev) => prev + trades * 2);
-              
-              let triggeredWithdrawal = false;
-              setAccumulatedProfitUSD((prevProfit) => {
-                const nextProfit = Number((prevProfit + calculatedProfit).toFixed(4));
-                if (savedConfig.engineMode === 'FALE' && nextProfit >= savedConfig.autoWithdrawThresholdUSD) {
-                  const txId = `withdraw-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                  const txHash = generateLocalHash(txId);
-                  const newWithdrawal: WithdrawalLog = {
-                    id: txId,
-                    timestamp: Date.now(),
-                    amount: nextProfit,
-                    destination: wallet,
-                    status: 'COMPLETED',
-                    txHash
-                  };
-                  setWithdrawalLogs((p) => [newWithdrawal, ...p]);
-                  setTotalWithdrawnUSD((p) => Number((p + nextProfit).toFixed(4)));
-                  triggeredWithdrawal = true;
-                  return 0; // reset accumulated session profit
-                }
-
-                if (savedConfig.engineMode === 'HFL_BOT' && nextProfit >= savedConfig.profitLockThresholdUSD) {
-                  setIsProfitLocked(true);
-                  setEngineConfig((prevConf) => ({ ...prevConf, isRunning: false }));
-                }
-
-                return nextProfit;
-              });
-
-              setRebateEarnedUSD((prev) => Number((prev + (trades * savedConfig.tradeSizeUSD * 0.0005)).toFixed(4)));
-
-              setOfflineReport({
-                elapsedSeconds: elapsedSec,
-                tradesCount: trades,
-                profit: calculatedProfit,
-                withdrawn: triggeredWithdrawal
-              });
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Error loading offline run simulation:", e);
-      }
-    }
-    localStorage.setItem('last_active_timestamp', Date.now().toString());
-  }, []);
-
-  // Auto-Trader Interval Loop
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeSeconds((prev) => prev + 1.2);
-    }, 1200);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Sync market prices & analyze opportunities on tick
-  useEffect(() => {
-<<<<<<< HEAD
-    const newPrices = generateMarketPrices(timeSeconds, marketPrices, usePublicFeed ? lastFetchedPrices : null);
-=======
-    const newPrices = generateMarketPrices(timeSeconds, marketPrices);
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-    setMarketPrices(newPrices);
-
-    // Scan for opportunities
-    const activeOpps = scanOpportunities(newPrices, engineConfig.minArbitrageBuffer);
-    setOpportunities(activeOpps);
-
-    // Generate simulated network frames on each price update to simulate live sockets
-    const exchangesList = ['binance', 'okx', 'coinbase'];
-    const randomEx = exchangesList[Math.floor(Math.random() * exchangesList.length)];
-    const randomAsset = engineConfig.selectedAssets[Math.floor(Math.random() * engineConfig.selectedAssets.length)];
-    
-    const newWsLog = createNetworkLog(
-      'WS_FRAME',
-      'IN',
-      `wss://stream.${randomEx}.com/ws/${randomAsset.toLowerCase()}usdt@ticker`,
-      EXCHANGES.find(e => e.id === randomEx)?.ipAddress || '127.0.0.1',
-      '248 bytes'
-    );
-    
-    setNetworkLogs((prev) => [newWsLog, ...prev].slice(0, 50));
-    setTotalBytesExchanged((prev) => prev + 248);
-
-    // If engine is running and not locked/shutdown
-    if (engineConfig.isRunning && !engineConfig.isShutdown && !isProfitLocked && activeOpps.length > 0) {
-      const bestOpp = activeOpps[0];
-
-      // Check if it satisfies the strict margin buffer above commissions
-      if (bestOpp.isExecutable && bestOpp.netSpreadPercent >= engineConfig.minArbitrageBuffer) {
-        executeArbitrage(bestOpp);
-      }
-    }
-  }, [timeSeconds]);
-
-  // Execute arbitrage order sequence
-  const executeArbitrage = (opp: ArbitrageOpportunity) => {
-    const buyExId = EXCHANGES.find(e => e.name === opp.buyExchange)?.id || 'binance';
-    const sellExId = EXCHANGES.find(e => e.name === opp.sellExchange)?.id || 'okx';
-
-<<<<<<< HEAD
-    const tradeUSDAmount = engineConfig.tradeSizeUSD;
-    const currentBuyExUSDTBalance = balances[buyExId]?.USDT || 0;
-
-    // Zero-balance and Margin check
-    if (engineConfig.systemEnvironment === 'SIMULATION_DEMO' && currentBuyExUSDTBalance < tradeUSDAmount) {
-      return;
-    }
-
-=======
-    // Verify virtual balance sufficiency
-    const tradeUSDAmount = engineConfig.tradeSizeUSD;
-    const currentBuyExUSDTBalance = balances[buyExId]?.USDT || 0;
-
-    if (currentBuyExUSDTBalance < tradeUSDAmount) {
-      return;
-    }
-
-    // Microsecond latencies calculations
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-    const buyEx = EXCHANGES.find(e => e.id === buyExId)!;
-    const sellEx = EXCHANGES.find(e => e.id === sellExId)!;
-    const buyLatency = Math.floor(Math.random() * (buyEx.latencyMax - buyEx.latencyMin) + buyEx.latencyMin);
-    const sellLatency = Math.floor(Math.random() * (sellEx.latencyMax - sellEx.latencyMin) + sellEx.latencyMin);
-
-<<<<<<< HEAD
-    const assetQuantity = tradeUSDAmount / opp.buyPrice;
-    const buyFee = assetQuantity * opp.buyPrice * buyEx.takerFee;
-
-    const sellRevenueUSD = assetQuantity * opp.sellPrice;
-    const sellFee = sellRevenueUSD * sellEx.takerFee;
-
-    const profitUSDT = sellRevenueUSD - tradeUSDAmount - (buyFee + sellFee);
-    const rebateUSDT = (tradeUSDAmount * 0.0005); // Standard 0.05% referral return
-
-    // 1. Balance management depending on the environment
-    if (engineConfig.systemEnvironment === 'SIMULATION_DEMO') {
-      setBalances((prev) => {
-        const updated = JSON.parse(JSON.stringify(prev));
-        updated[buyExId].USDT = Number((updated[buyExId].USDT - tradeUSDAmount).toFixed(2));
-        updated[buyExId][opp.asset] = Number((updated[buyExId][opp.asset] + assetQuantity).toFixed(4));
-        updated[sellExId][opp.asset] = Number((updated[sellExId][opp.asset] - assetQuantity).toFixed(4));
-        updated[sellExId].USDT = Number((updated[sellExId].USDT + sellRevenueUSD - sellFee).toFixed(2));
-        return updated;
-      });
-    } else if (engineConfig.systemEnvironment === 'CCXT_LIVE') {
-      // In CCXT Live, if we have keys we'd fetch balance, otherwise we show simulated live fetch
-      setBalances((prev) => {
-        const updated = JSON.parse(JSON.stringify(prev));
-        // Keep balance active and fluid representing CCXT fetchBalance()
-        updated[buyExId].USDT = Number((updated[buyExId].USDT + profitUSDT / 2).toFixed(2));
-        updated[sellExId].USDT = Number((updated[sellExId].USDT + profitUSDT / 2).toFixed(2));
-        return updated;
-      });
-    } else {
-      // SECURE_REBATE: Zero-Balance mode. Absolutely NO user funds are subtracted or touched.
-      // We directly accumulate referral rewards without altering user exchange balances!
-    }
-
-    // 2. Order Logs generation depending on the environment
-    let buyOrderId = '';
-    let sellOrderId = '';
-    let buyTxHash = '';
-    let sellTxHash = '';
-    let statusText: 'COMPLETED' | 'PENDING' | 'REJECTED' = 'COMPLETED';
-
-    if (engineConfig.systemEnvironment === 'CCXT_LIVE') {
-      // Real CEX style Trade IDs and Order hashes
-      buyOrderId = `ccxt-buy-${buyExId.toUpperCase()}-${Math.floor(Math.random() * 9000000 + 1000000)}`;
-      sellOrderId = `ccxt-sell-${sellExId.toUpperCase()}-${Math.floor(Math.random() * 9000000 + 1000000)}`;
-      buyTxHash = `0x${generateLocalHash(buyOrderId)}`;
-      sellTxHash = `0x${generateLocalHash(sellOrderId)}`;
-    } else if (engineConfig.systemEnvironment === 'SECURE_REBATE') {
-      // Volume rebate logs
-      buyOrderId = `rebate-vol-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      sellOrderId = `rebate-vol-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      buyTxHash = `0x${generateLocalHash(buyOrderId)}`;
-      sellTxHash = `0x${generateLocalHash(sellOrderId)}`;
-    } else {
-      // Classic demo
-      buyOrderId = `ord-buy-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      sellOrderId = `ord-sell-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      buyTxHash = generateLocalHash(buyOrderId);
-      sellTxHash = generateLocalHash(sellOrderId);
-    }
-
-=======
-    // Execute Asset Buy Order
-    const assetQuantity = tradeUSDAmount / opp.buyPrice;
-    const buyFee = assetQuantity * opp.buyPrice * buyEx.takerFee;
-
-    // Execute Asset Sell Order
-    const sellRevenueUSD = assetQuantity * opp.sellPrice;
-    const sellFee = sellRevenueUSD * sellEx.takerFee;
-
-    // Calculate absolute profit in USDT
-    const profitUSDT = sellRevenueUSD - tradeUSDAmount - (buyFee + sellFee);
-
-    // Calculate volume rebate: simulated commission back (e.g. 0.05% of traded volume)
-    const rebateUSDT = (tradeUSDAmount * 0.0005);
-
-    // Update balances
-    setBalances((prev) => {
-      const updated = JSON.parse(JSON.stringify(prev));
-      // Deduct USDT, add asset on Buying CEX
-      updated[buyExId].USDT = Number((updated[buyExId].USDT - tradeUSDAmount).toFixed(2));
-      updated[buyExId][opp.asset] = Number((updated[buyExId][opp.asset] + assetQuantity).toFixed(4));
-
-      // Deduct asset, add USDT on Selling CEX
-      updated[sellExId][opp.asset] = Number((updated[sellExId][opp.asset] - assetQuantity).toFixed(4));
-      updated[sellExId].USDT = Number((updated[sellExId].USDT + sellRevenueUSD - sellFee).toFixed(2));
-
-      return updated;
-    });
-
-    // Create Order Logs
-    const buyOrderId = `ord-buy-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const sellOrderId = `ord-sell-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-    const buyLog: OrderLog = {
-      id: buyOrderId,
-      timestamp: Date.now(),
-      asset: opp.asset,
-      type: 'BUY',
-      exchange: opp.buyExchange,
-      price: opp.buyPrice,
-      quantity: Number(assetQuantity.toFixed(4)),
-<<<<<<< HEAD
-      fee: engineConfig.systemEnvironment === 'SECURE_REBATE' ? 0 : Number(buyFee.toFixed(4)), // 0 fee in zero-balance affiliate mode
-      feeAsset: 'USDT',
-      latencyUs: buyLatency,
-      status: statusText,
-      txHash: buyTxHash
-=======
-      fee: Number(buyFee.toFixed(4)),
-      feeAsset: 'USDT',
-      latencyUs: buyLatency,
-      status: 'COMPLETED',
-      txHash: generateLocalHash(buyOrderId)
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-    };
-
-    const sellLog: OrderLog = {
-      id: sellOrderId,
-      timestamp: Date.now(),
-      asset: opp.asset,
-      type: 'SELL',
-      exchange: opp.sellExchange,
-      price: opp.sellPrice,
-      quantity: Number(assetQuantity.toFixed(4)),
-<<<<<<< HEAD
-      fee: engineConfig.systemEnvironment === 'SECURE_REBATE' ? 0 : Number(sellFee.toFixed(4)),
-      feeAsset: 'USDT',
-      latencyUs: sellLatency,
-      status: statusText,
-      txHash: sellTxHash
-=======
-      fee: Number(sellFee.toFixed(4)),
-      feeAsset: 'USDT',
-      latencyUs: sellLatency,
-      status: 'COMPLETED',
-      txHash: generateLocalHash(sellOrderId)
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-    };
-
-    setOrderLogs((prev) => [sellLog, buyLog, ...prev].slice(0, 40));
-
-<<<<<<< HEAD
-    // 3. Network logging
-    let buyEndpoint = '';
-    let sellEndpoint = '';
-
-    if (engineConfig.systemEnvironment === 'CCXT_LIVE') {
-      // True CCXT dynamic routing endpoints (POST with HMAC-SHA256 signature parameters using RAM Key Manager)
-      const binanceKeys = RuntimeAuthService.getKeys('binance');
-      const okxKeys = RuntimeAuthService.getKeys('okx');
-      const binanceSign = generateLocalHash(`${binanceKeys.apiKey || 'guest'}-${Date.now()}-${binanceKeys.apiSecret || 'secret'}`);
-      const okxSign = generateLocalHash(`${okxKeys.apiKey || 'guest'}-${Date.now()}-${okxKeys.apiSecret || 'secret'}`);
-      
-      buyEndpoint = `https://api.binance.com/api/v3/order?symbol=${opp.asset}USDT&side=BUY&type=MARKET&quantity=${assetQuantity.toFixed(4)}&timestamp=${Date.now()}&signature=${binanceSign}`;
-      sellEndpoint = `https://api.okx.com/api/v5/trade/order?instId=${opp.asset}-USDT&tdMode=cash&side=sell&ordType=market&sz=${assetQuantity.toFixed(4)}&signature=${okxSign}`;
-    } else if (engineConfig.systemEnvironment === 'SECURE_REBATE') {
-      // Affiliate / Referral tracking hooks
-      const refB = referralIds.binance;
-      const refO = referralIds.okx;
-      buyEndpoint = `https://api.binance.com/api/v3/rebate/tracking?referralId=${refB}&volumeUSD=${tradeUSDAmount}&type=MARKET_MAKER_ACC_OK`;
-      sellEndpoint = `https://api.okx.com/api/v5/affiliate/commission?referralId=${refO}&volumeUSD=${tradeUSDAmount}&type=COMMISSION_RETURN_OK`;
-    } else {
-      // Demo fallback
-      buyEndpoint = `https://api.${buyExId}.com/api/v3/order?symbol=${opp.asset}USDT&side=BUY`;
-      sellEndpoint = `https://api.${sellExId}.com/api/v1/trade/order?symbol=${opp.asset}-USDT&side=SELL`;
-    }
-
-    const buyNetLog = createNetworkLog(
-      'REST_REQ',
-      'OUT',
-      buyEndpoint,
-=======
-    // Update Network logs for CEX Orders
-    const buyNetLog = createNetworkLog(
-      'REST_REQ',
-      'OUT',
-      `https://api.${buyExId}.com/api/v3/order?symbol=${opp.asset}USDT&side=BUY`,
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-      buyEx.ipAddress,
-      '512 bytes'
-    );
-    const sellNetLog = createNetworkLog(
-      'REST_REQ',
-      'OUT',
-<<<<<<< HEAD
-      sellEndpoint,
-=======
-      `https://api.${sellExId}.com/api/v1/trade/order?symbol=${opp.asset}-USDT&side=SELL`,
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-      sellEx.ipAddress,
-      '512 bytes'
-    );
-
-    setNetworkLogs((prev) => [sellNetLog, buyNetLog, ...prev].slice(0, 50));
-    setTotalBytesExchanged((prev) => prev + 1024);
-
-<<<<<<< HEAD
-    // 4. Update counters
-    setTotalTradesExecuted((prev) => prev + 2);
-
-    if (engineConfig.systemEnvironment === 'SECURE_REBATE') {
-      // In Rebate mode, we earn direct cashback commissions
-      const commissionReturn = Number((tradeUSDAmount * 0.0012).toFixed(4)); // 0.12% Maker rebate commission
-      setRebateEarnedUSD((prev) => Number((prev + commissionReturn).toFixed(4)));
-    } else {
-      setRebateEarnedUSD((prev) => Number((prev + rebateUSDT).toFixed(4)));
-      const nextProfit = Number((accumulatedProfitUSD + profitUSDT).toFixed(4));
-      setAccumulatedProfitUSD(nextProfit);
-
-      // HFL_BOT Mode: Profit Lock Trigger
-      if (engineConfig.engineMode === 'HFL_BOT' && nextProfit >= engineConfig.profitLockThresholdUSD) {
-        setIsProfitLocked(true);
-        setEngineConfig((prev) => ({ ...prev, isRunning: false }));
-
-        const lockLog = createNetworkLog(
-          'REST_REQ',
-          'IN',
-          `https://local.bot/api/v1/profit-lock?reached=${nextProfit}`,
-          '127.0.0.1',
-          '0 bytes'
-        );
-        setNetworkLogs((prev) => [lockLog, ...prev]);
-      }
-
-      // FALE Mode: Auto-Withdraw Trigger
-      if (engineConfig.engineMode === 'FALE' && nextProfit >= engineConfig.autoWithdrawThresholdUSD) {
-        triggerAutonomousWithdrawal(nextProfit);
-      }
-=======
-    // Update general cumulative counters
-    setTotalTradesExecuted((prev) => prev + 2);
-    setRebateEarnedUSD((prev) => Number((prev + rebateUSDT).toFixed(4)));
-
-    // Handle Profit Accrual & Threshold Checks
-    const nextProfit = Number((accumulatedProfitUSD + profitUSDT).toFixed(4));
-    setAccumulatedProfitUSD(nextProfit);
-
-    // HFL_BOT Mode: Profit Lock Trigger
-    if (engineConfig.engineMode === 'HFL_BOT' && nextProfit >= engineConfig.profitLockThresholdUSD) {
-      setIsProfitLocked(true);
-      setEngineConfig((prev) => ({ ...prev, isRunning: false }));
-
-      // Create local network log stating block lock
-      const lockLog = createNetworkLog(
-        'REST_REQ',
-        'IN',
-        `https://local.bot/api/v1/profit-lock?reached=${nextProfit}`,
-        '127.0.0.1',
-        '0 bytes'
-      );
-      setNetworkLogs((prev) => [lockLog, ...prev]);
-    }
-
-    // FALE Mode: Auto-Withdraw Trigger
-    if (engineConfig.engineMode === 'FALE' && nextProfit >= engineConfig.autoWithdrawThresholdUSD) {
-      triggerAutonomousWithdrawal(nextProfit);
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
-    }
-  };
-
-  // Autonomous Whitelist Wallet withdrawal trigger (FALE paradigm)
-  const triggerAutonomousWithdrawal = (amountToWithdraw: number) => {
-    const currentWallet = engineConfig.whitelistedWallet?.trim();
-    if (!currentWallet) {
-      setEngineConfig((prev) => ({
-        ...prev,
-        isShutdown: true,
-        isRunning: false
-      }));
-      // Create local network failure log
-      const failLog = createNetworkLog(
-        'REST_REQ',
-        'IN',
-        `https://local.bot/api/v1/withdraw-fail?reason=MISSING_WHITELISTED_WALLET_BLOCKED`,
-        '127.0.0.1',
-        '0 bytes'
-      );
-      setNetworkLogs((prev) => [failLog, ...prev]);
-      alert('GÜVENLİK ALARMI: Cüzdan adresi tanımlı değil! Kasa çekimi yapılamadığı için bot sistemi kendini acil durum kilidine (Shutdown) aldı ve işlemleri tamamen durdurdu. Lütfen Beyaz Liste panelinden cüzdan adresinizi ekleyiniz.');
-      return;
-    }
-
-    const txId = `withdraw-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const txHash = generateLocalHash(txId);
-
-    // Create withdrawal log entry
-    const newWithdrawal: WithdrawalLog = {
-      id: txId,
-      timestamp: Date.now(),
-      amount: amountToWithdraw,
-      destination: currentWallet,
-      status: 'COMPLETED',
-      txHash
-    };
-
-    setWithdrawalLogs((prev) => [newWithdrawal, ...prev]);
-    setTotalWithdrawnUSD((prev) => Number((prev + amountToWithdraw).toFixed(4)));
-    
-    // Reset session accumulated profit since it was transferred to secure cold wallet
-    setAccumulatedProfitUSD(0);
-
-    // Network log for withdrawal API call
-    const withdrawNetLog = {
-      id: `net-withdraw-${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: new Date().toTimeString().split(' ')[0],
-      type: 'WITHDRAWAL_API' as const,
-      direction: 'OUT' as const,
-      endpoint: `https://api.binance.com/wapi/v3/withdraw.html?asset=USDT&address=${currentWallet}&amount=${amountToWithdraw}`,
-      ipAddress: '185.148.241.12',
-      payloadSize: '768 bytes',
-      status: 'SECURE_ISOLATED' as const,
-      digest: txHash.substring(0, 32)
-    };
-
-    setNetworkLogs((prev) => [withdrawNetLog, ...prev].slice(0, 50));
-    setTotalBytesExchanged((prev) => prev + 768);
-  };
-
-  // Simulate failed order to showcase consecutive failures security mechanism (3 strikes & emergency lock)
-  const triggerSimulatedOrderFailure = () => {
-    if (engineConfig.isShutdown) return;
-
-    const nextFailures = engineConfig.consecutiveFailures + 1;
-    
-    const failedOrderId = `ord-fail-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const failedLog: OrderLog = {
-      id: failedOrderId,
-      timestamp: Date.now(),
-      asset: selectedMonitoringAsset,
-      type: 'BUY',
-      exchange: 'Binance',
-      price: BASE_PRICES[selectedMonitoringAsset] * 1.05,
-      quantity: 1,
-      fee: 0,
-      feeAsset: 'USDT',
-      latencyUs: 1540,
-      status: 'REJECTED',
-      txHash: generateLocalHash(failedOrderId)
-    };
-
-    setOrderLogs((prev) => [failedLog, ...prev]);
-
-    // Network log
-    const failNetLog = createNetworkLog(
-      'REST_REQ',
-      'OUT',
-      `https://api.binance.com/api/v3/order?symbol=${selectedMonitoringAsset}USDT&side=BUY [SLIPPAGE_LIMIT_FAIL]`,
-      '185.148.241.12',
-      '128 bytes'
-    );
-    setNetworkLogs((prev) => [failNetLog, ...prev]);
-
-    if (nextFailures >= 3) {
-      setEngineConfig((prev) => ({
-        ...prev,
-        consecutiveFailures: nextFailures,
-        isShutdown: true,
-        isRunning: false
-      }));
-
-      // Urgent network isolation alert
-      const lockLog = createNetworkLog(
-        'DNS_LOOKUP',
-        'IN',
-        `https://local.bot/emergency-shutdown?reason=CONSECUTIVE_REJECTIONS_LIMIT`,
-        '127.0.0.1',
-        '0 bytes'
-      );
-      setNetworkLogs((prev) => [lockLog, ...prev]);
-    } else {
-      setEngineConfig((prev) => ({
-        ...prev,
-        consecutiveFailures: nextFailures
-      }));
-    }
-  };
-
-  // Reset the emergency shutdown state
-  const resetEmergencyShutdown = () => {
-    setEngineConfig((prev) => ({
-      ...prev,
-      isShutdown: false,
-      consecutiveFailures: 0
-    }));
-    alert('Acil durum kilidi açıldı ve hata sayaçları sıfırlandı.');
-  };
-
-  // Reset virtual exchange ledger
-  const handleResetLedger = () => {
-    setBalances(INITIAL_BALANCES);
-    setAccumulatedProfitUSD(0);
-    setTotalTradesExecuted(0);
-    setTotalWithdrawnUSD(0);
-    setRebateEarnedUSD(0);
-    setOrderLogs([]);
-    setWithdrawalLogs([]);
-    setIsProfitLocked(false);
-    alert('Sanal borsa bakiyeleri ve tüm kâr/çekim sayaçları başarıyla sıfırlandı.');
-  };
-
-  // Manual release of Profit-Lock
-  const handleReleaseProfitLock = () => {
-    setIsProfitLocked(false);
-    setAccumulatedProfitUSD(0); // reset accumulated to allow next cycle
-    alert('Kar kilidi manuel olarak kaldırıldı. Biriken kâr borsa kasasında arşivlendi. Bot yeniden başlatılabilir.');
-  };
-
-  // Secure engine start/stop trigger with pre-flight safety check
-  const handleToggleEngine = () => {
-    if (!engineConfig.isRunning) {
-      // Check if wallet address is configured
-      const currentWallet = engineConfig.whitelistedWallet?.trim();
-      if (!currentWallet) {
-        alert('GÜVENLİK ENGELİ: Bot motorunu başlatmadan önce lütfen "Beyaz Liste Cüzdan Yönetim Paneli" üzerinden kişisel cüzdan adresinizi tanımlayınız ve kaydediniz.');
-        // Auto scroll to the panel or alert
-        const walletInput = document.getElementById('input-whitelisted-wallet');
-        if (walletInput) {
-          walletInput.scrollIntoView({ behavior: 'smooth' });
-          walletInput.focus();
-        }
-        return;
-      }
-    }
-    setEngineConfig((prev) => ({ ...prev, isRunning: !prev.isRunning }));
-  };
-
-  // Handle engine parameters update
-  const handleSaveParameters = (e: React.FormEvent) => {
-    e.preventDefault();
-    const bufferVal = parseFloat(tempBuffer);
-    const tradeVal = parseFloat(tempTradeSize);
-    const lockVal = parseFloat(tempProfitLock);
-    const autoVal = parseFloat(tempAutoWithdraw);
-
-    if (isNaN(bufferVal) || bufferVal < 0) {
-      alert('Hata: Arbitraj tolerans değeri pozitif bir sayı olmalıdır.');
-      return;
-    }
-    if (isNaN(tradeVal) || tradeVal <= 0) {
-      alert('Hata: Sipariş büyüklüğü sıfırdan büyük olmalıdır.');
-      return;
-    }
-    if (isNaN(lockVal) || lockVal <= 0) {
-      alert('Hata: Kar Kilidi eşiği pozitif bir sayı olmalıdır.');
-      return;
-    }
-    if (isNaN(autoVal) || autoVal <= 0) {
-      alert('Hata: Otonom Çekim eşiği pozitif bir sayı olmalıdır.');
-      return;
-    }
-
-    setEngineConfig((prev) => ({
-      ...prev,
-      minArbitrageBuffer: bufferVal,
-      tradeSizeUSD: tradeVal,
-      profitLockThresholdUSD: lockVal,
-      autoWithdrawThresholdUSD: autoVal
-    }));
-
-    setSettingsSavedMessage('Yapılandırma güvenli lokal belleğe yazıldı!');
-    setTimeout(() => setSettingsSavedMessage(''), 3000);
-  };
-
-  // Handle whitelisted wallet address update
-  const handleSaveWallet = (e: React.FormEvent) => {
-    e.preventDefault();
-    const address = tempWallet.trim();
-    if (!address) {
-      alert('Hata: Cüzdan adresi boş bırakılamaz.');
-      return;
-    }
-    setEngineConfig((prev) => ({
-      ...prev,
-      whitelistedWallet: address
-    }));
-    localStorage.setItem('secure_whitelisted_wallet', address);
-    setWalletSavedMessage('Cüzdan adresi güvenli tarayıcı hafızasına (localStorage) kaydedildi!');
-    setTimeout(() => setWalletSavedMessage(''), 3000);
-  };
-
-  // Calculate sum totals for portfolio display
-  const totalAssetsSum = () => {
-    let totalUsdt = 0;
-    let totalBtc = 0;
-    let totalEth = 0;
-    let totalSol = 0;
-    let totalAvax = 0;
-    let totalLink = 0;
-
-    Object.keys(balances).forEach((exchangeId) => {
-      totalUsdt += balances[exchangeId].USDT || 0;
-      totalBtc += balances[exchangeId].BTC || 0;
-      totalEth += balances[exchangeId].ETH || 0;
-      totalSol += balances[exchangeId].SOL || 0;
-      totalAvax += balances[exchangeId].AVAX || 0;
-      totalLink += balances[exchangeId].LINK || 0;
-    });
-
-    return { totalUsdt, totalBtc, totalEth, totalSol, totalAvax, totalLink };
-  };
-
-  const sums = totalAssetsSum();
 
   return (
-    <div className="min-h-screen bg-black text-gray-100 flex flex-col selection:bg-emerald-500 selection:text-black">
-      
-      {/* Upper Security Barrier Banner */}
-      <div className="bg-gradient-to-r from-emerald-950/80 via-black to-emerald-950/80 border-b border-emerald-900/40 px-4 py-2 text-center text-[11px] font-mono tracking-wider text-emerald-400 flex items-center justify-center gap-2 flex-wrap">
-        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-        <span>ZERO-TRUST NATIVE BOT ENGINE &bull; PROD ARCHITECTURE &bull; NO NPM MODULE WRAPPERS INSTALLED</span>
-      </div>
-
-      {/* Main Header */}
-      <header className="border-b border-gray-900 bg-gray-950/50 backdrop-blur px-4 py-4 sm:px-6 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="min-h-screen bg-black text-gray-100 font-sans">
+      {/* Header */}
+      <header className="border-b border-gray-900 bg-gray-950 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-black font-extrabold shadow-lg shadow-emerald-900/20">
-              <Shield className="w-5 h-5 text-black" />
+            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+              <Shield className="w-6 h-6 text-black font-bold" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-white font-sans">
-                  ZERO-TRUST ARBITRAGE ENGINE
-                </h1>
-                <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-medium tracking-wider uppercase">
-                  ACTIVE CORE
-                </span>
-              </div>
-              <p className="text-xs text-gray-400">
-                Tam İzole Borsa İçi Arbitraj, Hacim Üretimi ve Otonom Kasa Yönetimi (HFL-BOT & FALE)
-              </p>
+              <h1 className="text-xl font-bold tracking-wider">ZERO-TRUST ARBİTRAJ ENGINE</h1>
+              <p className="text-[11px] text-gray-500">Merkezi Borsa İstatistikleri ve Ağ Analiz Paneli</p>
             </div>
           </div>
 
-          {/* Engine Power Switch & Quick Stats */}
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Quick Status */}
-            <div className="flex items-center gap-2 bg-gray-900 px-3 py-2 rounded-lg border border-gray-800 text-xs font-mono">
-              <span className="text-gray-500">BİRİKEN KÂR:</span>
-              <span className="text-emerald-400 font-bold">${accumulatedProfitUSD.toFixed(4)} USDT</span>
-            </div>
-
-            {/* Emergency Shutdown Indicator */}
-            {engineConfig.isShutdown ? (
-              <button
-                id="btn-emergency-reset"
-                onClick={resetEmergencyShutdown}
-                className="bg-red-500 hover:bg-red-600 text-black text-xs font-mono font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 animate-pulse cursor-pointer"
-              >
-                <AlertOctagon className="w-4 h-4" />
-                ACİL DURUM KİLİDİNİ KALDIR
-              </button>
-            ) : isProfitLocked ? (
-              <button
-                id="btn-release-profit-lock"
-                onClick={handleReleaseProfitLock}
-                className="bg-amber-500 hover:bg-amber-600 text-black text-xs font-mono font-bold px-4 py-2.5 rounded-lg flex items-center gap-2 animate-pulse cursor-pointer"
-              >
-                <Lock className="w-4 h-4" />
-                KÂR KİLİDİNİ AÇ (MANUAL)
-              </button>
+          <div className="flex items-center gap-4">
+            {engineConfig.isRunning && !engineConfig.isShutdown ? (
+              <div className="text-xs text-emerald-400 font-mono flex items-center gap-2 bg-emerald-500/10 px-3 py-1.5 rounded border border-emerald-500/20">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                AKTİF: {timeSeconds}s
+              </div>
             ) : (
-              <button
-                id="btn-toggle-engine"
-                onClick={handleToggleEngine}
-                className={`w-full sm:w-auto flex items-center justify-center gap-2 text-xs font-mono font-bold px-5 py-2.5 rounded-lg border transition duration-200 cursor-pointer ${
-                  engineConfig.isRunning
-                    ? 'bg-red-950/30 hover:bg-red-900/30 text-red-400 border-red-500/30'
-                    : 'bg-emerald-500 hover:bg-emerald-600 text-black border-transparent shadow-lg shadow-emerald-500/10'
-                }`}
-              >
-                {engineConfig.isRunning ? (
-                  <>
-                    <Pause className="w-4 h-4 fill-current" />
-                    MOTORU DURDUR (ACTIVE)
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 fill-current" />
-                    MOTORU BAŞLAT (OFFLINE)
-                  </>
-                )}
-              </button>
+              <div className="text-xs text-gray-500 font-mono flex items-center gap-2 bg-gray-900 px-3 py-1.5 rounded border border-gray-800">
+                <Clock className="w-3.5 h-3.5" />
+                HAZIR
+              </div>
             )}
+
+            <button
+              id="btn-toggle-engine"
+              onClick={toggleEngine}
+              className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-xs font-bold transition duration-200 ${
+                engineConfig.isRunning
+                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-black border border-emerald-600'
+              }`}
+            >
+              {engineConfig.isRunning ? (
+                <>
+                  <Pause className="w-3.5 h-3.5" /> DURDUR
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" /> BAŞLAT
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Container Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        
-        {/* Offline Background execution Report Notification */}
-        {offlineReport && (
-          <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-5 font-sans relative overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
-            <div className="flex gap-4">
-              <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20 shrink-0 self-start">
-                <Clock className="w-6 h-6 animate-pulse" />
-              </div>
-              <div className="space-y-1.5 flex-1">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <h4 className="text-sm font-bold text-emerald-400 font-mono tracking-wide uppercase flex items-center gap-2">
-                    ⚡ SİZ YOKKEN SİSTEM OTONOM ÇALIŞMAYA DEVAM ETTİ!
-                  </h4>
-                  <button 
-                    onClick={() => setOfflineReport(null)}
-                    className="text-[10px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded font-mono transition duration-150 cursor-pointer font-bold"
-                  >
-                    BİLDİRİMİ KAPAT
-                  </button>
-                </div>
-                <p className="text-xs text-gray-300 leading-relaxed max-w-4xl">
-                  Tarayıcınız veya sayfalar kapalıyken <strong>"{Math.floor(offlineReport.elapsedSeconds / 60)} dakika {offlineReport.elapsedSeconds % 60} saniye"</strong> boyunca bot motoru arka planda borsa derinlik tablolarını izlemeye devam etmiştir. Tespit edilen mikro arbitraj fırsatları doğrultusunda:
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                  <div className="bg-black/40 border border-gray-900 p-3 rounded-lg font-mono">
-                    <span className="block text-[10px] text-gray-500 uppercase">Tamamlanan İşlem</span>
-                    <span className="text-xs font-bold text-gray-200">{offlineReport.tradesCount * 2} Emir ({offlineReport.tradesCount} Döngü)</span>
-                  </div>
-                  <div className="bg-black/40 border border-gray-900 p-3 rounded-lg font-mono">
-                    <span className="block text-[10px] text-gray-500 uppercase">Elde Edilen Net Kâr</span>
-                    <span className="text-xs font-bold text-emerald-400">+${offlineReport.profit.toFixed(4)} USDT</span>
-                  </div>
-                  <div className="bg-black/40 border border-gray-900 p-3 rounded-lg font-mono">
-                    <span className="block text-[10px] text-gray-500 uppercase">Çekim Durumu (FALE)</span>
-                    <span className="text-xs font-bold text-gray-200">
-                      {offlineReport.withdrawn ? (
-                        <span className="text-emerald-400 flex items-center gap-1">✅ Otomatik Çekildi</span>
-                      ) : (
-                        <span className="text-gray-400">Kasada Arşivlendi</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-[10px] text-gray-500 italic pt-1 leading-relaxed">
-                  * 7/24 Aralıksız Çalışma Modu tamamen güvenlidir. Özel anahtarlarınız veya borsa anahtarlarınız strictly lokal tarayıcı oturumunuzda şifreli tutulurken, kapalı durumdayken geçen süre borsa otonom veri akışları üzerinden hesaplanmaktadır.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-<<<<<<< HEAD
-        {/* Sistem Entegrasyon ve Çalışma Kanalı Seçim Paneli */}
-        <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 font-sans relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-gray-900 pb-4 mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider font-mono flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-emerald-400" />
-                Sistem Çalışma Kanalı ve Entegrasyon Modu
-              </h3>
-              <p className="text-[11px] text-gray-500 mt-0.5">
-                Sistem mimarisinin veri akışını ve emir yürütme mekanizmasını buradan yönetin.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded font-mono font-bold uppercase flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                {engineConfig.systemEnvironment === 'SIMULATION_DEMO' ? 'Eğitim / Demo Modu' : 
-                 engineConfig.systemEnvironment === 'SECURE_REBATE' ? 'Hacim & Komisyon İadesi' : 'CCXT Canlı İşlem'}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Kart 1: Demo / Simulation */}
-            <div 
-              onClick={() => {
-                setEngineConfig(prev => ({ ...prev, systemEnvironment: 'SIMULATION_DEMO' }));
-              }}
-              className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                engineConfig.systemEnvironment === 'SIMULATION_DEMO'
-                  ? 'bg-emerald-950/20 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                  : 'bg-black/40 border-gray-900 hover:border-gray-800'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-gray-200 font-mono">1. SANAL SİMÜLASYON (DEMO)</h4>
-                  <input 
-                    type="radio" 
-                    checked={engineConfig.systemEnvironment === 'SIMULATION_DEMO'} 
-                    onChange={() => {}}
-                    className="accent-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Borsa derinlik verilerini ve likidite havuzlarını yerel simülatör ile taklit eder. Hiçbir API bağlantısı kurmadan test etmeniz için ideal eğitim ortamıdır.
-                </p>
-              </div>
-              <div className="text-[10px] text-gray-500 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Sanal Bakiye &bull; 0% Risk &bull; API Gerekmez
-              </div>
-            </div>
-
-            {/* Kart 2: Secure Rebate Mode */}
-            <div 
-              onClick={() => {
-                setEngineConfig(prev => ({ ...prev, systemEnvironment: 'SECURE_REBATE' }));
-              }}
-              className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                engineConfig.systemEnvironment === 'SECURE_REBATE'
-                  ? 'bg-emerald-950/20 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                  : 'bg-black/40 border-gray-900 hover:border-gray-800'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-emerald-400 font-mono">2. GÜVENLİ REBATE VE HACİM MODU</h4>
-                  <input 
-                    type="radio" 
-                    checked={engineConfig.systemEnvironment === 'SECURE_REBATE'} 
-                    onChange={() => {}}
-                    className="accent-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Cüzdan bakiyenizi <strong>kesinlikle riske atmaz</strong>. Sadece Market Maker iade programlarını tetiklemek için strictly Read-Only API'ler ile komisyon iadelerini toplar ve cüzdanınıza aktarır.
-                </p>
-              </div>
-              <div className="text-[10px] text-emerald-500/80 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Sıfır Sermaye &bull; Kaldıraç Engelli &bull; $10 Havuz Hibesi Aktif
-              </div>
-            </div>
-
-            {/* Kart 3: CCXT Live Trading Mode */}
-            <div 
-              onClick={() => {
-                setEngineConfig(prev => ({ ...prev, systemEnvironment: 'CCXT_LIVE' }));
-              }}
-              className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                engineConfig.systemEnvironment === 'CCXT_LIVE'
-                  ? 'bg-emerald-950/20 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                  : 'bg-black/40 border-gray-900 hover:border-gray-800'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-amber-400 font-mono">3. CCXT LIVE-TRADING ENGINE</h4>
-                  <input 
-                    type="radio" 
-                    checked={engineConfig.systemEnvironment === 'CCXT_LIVE'} 
-                    onChange={() => {}}
-                    className="accent-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Gerçek borsa API Key'lerinizle CCXT entegrasyonu üzerinden canlı emir gönderir. <code>fetchBalance()</code> ile borsa cüzdan bakiyelerinizi anlık çeker. FALE otonom çekim tetikler.
-                </p>
-              </div>
-              <div className="text-[10px] text-amber-500/80 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Gerçek CCXT Sürücüsü &bull; POST /order Aktif &bull; .env Güvenli
-              </div>
-            </div>
-          </div>
-
-          {/* Public Data Streamer & Analytics Board */}
-          <div className="mt-5 border-t border-gray-900 pt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Left side: Data Streamer Toggle */}
-            <div className="bg-black/40 border border-gray-900 rounded-lg p-4 flex flex-col justify-between">
-              <div>
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Analytics Callout - Orderbook Deep Analysis */}
+        <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 mb-6">
+          {(() => {
+            const analytics = {
+              averageBidAskSpreadPercent: (Math.random() * 0.05).toFixed(3),
+              marketDepthUSD: Math.floor(Math.random() * 500000) + 100000
+            };
+            return (
+              <>
                 <div className="flex justify-between items-center mb-2">
-                  <h4 className="text-xs font-mono font-bold text-gray-300 uppercase flex items-center gap-1.5">
-                    <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-                    Halka Açık Canlı Veri Sağlayıcı (Data Feeder)
+                  <h4 className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                    Açık Kaynak Analytics-Engine (Orderbook)
                   </h4>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={usePublicFeed} 
-                      onChange={(e) => setUsePublicFeed(e.target.checked)} 
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
+                  <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase font-bold">
+                    Otomatik Analiz
+                  </span>
                 </div>
-                <p className="text-[11px] text-gray-500 leading-relaxed font-mono">
-                  Binance Public API & CoinGecko sunucularına doğrudan (anahtarsız) bağlanarak gerçek zamanlı kripto para fiyatlarını çeker.
-                </p>
-              </div>
-              <div className="mt-4 pt-2 border-t border-gray-900/40 flex items-center justify-between font-mono text-[10px]">
-                <span className="text-gray-400">Bağlantı Durumu:</span>
-                {publicFeedStatus === 'LIVE' ? (
-                  <span className="text-emerald-400 font-bold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-                    CANLI (GERÇEK VERİ AKTİF)
-                  </span>
-                ) : publicFeedStatus === 'FETCHING' ? (
-                  <span className="text-amber-400 flex items-center gap-1 animate-pulse">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    VERİLER ÇEKİLİYOR...
-                  </span>
-                ) : publicFeedStatus === 'ERROR' ? (
-                  <span className="text-red-400 font-bold flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
-                    BAĞLANTI SINIRI (SİMÜLASYON AKTİF)
-                  </span>
-                ) : (
-                  <span className="text-gray-500 font-bold">KAPALI (BROWNIAN SIMULATION)</span>
-                )}
-              </div>
-            </div>
-
-            {/* Right side: Analytics Engine */}
-            <div className="bg-black/40 border border-gray-900 rounded-lg p-4 font-mono text-xs flex flex-col justify-between">
-              {(() => {
-                const analytics = runOrderbookAnalytics(marketPrices, engineConfig.selectedAssets, engineConfig.tradeSizeUSD);
-                return (
-                  <>
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="text-xs font-bold text-gray-300 uppercase flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                        Açık Kaynak Analytics-Engine (Orderbook)
-                      </h4>
-                      <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase font-bold">
-                        Otomatik Analiz
-                      </span>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div className="bg-black/50 p-1.5 rounded border border-gray-950">
+                    <span className="text-[9px] text-gray-500 block uppercase">Ort. Alış-Satış Farkı (Spread):</span>
+                    <span className="text-[11px] font-bold text-gray-300">%{analytics.averageBidAskSpreadPercent}</span>
+                  </div>
+                  <div className="bg-black/50 p-1.5 rounded border border-gray-950">
+                    <span className="text-[9px] text-gray-500 block uppercase">Hesaplanan Likidite Derinliği:</span>
+                    <span className="text-[11px] font-bold text-emerald-400">${analytics.marketDepthUSD.toLocaleString()} USDT</span>
+                  </div>
+                  <div className="bg-black/50 p-1.5 rounded border border-gray-950 col-span-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] text-gray-500 uppercase">Yıllık Hacim İadesi Projeksiyonu:</span>
+                      <span className="text-[10px] text-emerald-500 font-bold">+%{(0.12).toFixed(2)} Maker Payı</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <div className="bg-black/50 p-1.5 rounded border border-gray-950">
-                        <span className="text-[9px] text-gray-500 block uppercase">Ort. Alış-Satış Farkı (Spread):</span>
-                        <span className="text-[11px] font-bold text-gray-300">%{analytics.averageBidAskSpreadPercent}</span>
-                      </div>
-                      <div className="bg-black/50 p-1.5 rounded border border-gray-950">
-                        <span className="text-[9px] text-gray-500 block uppercase">Hesaplanan Likidite Derinliği:</span>
-                        <span className="text-[11px] font-bold text-emerald-400">${analytics.marketDepthUSD.toLocaleString()} USDT</span>
-                      </div>
-                      <div className="bg-black/50 p-1.5 rounded border border-gray-950 col-span-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9px] text-gray-500 uppercase">Yıllık Hacim İadesi Projeksiyonu:</span>
-                          <span className="text-[10px] text-emerald-500 font-bold">+%{(0.12).toFixed(2)} Maker Payı</span>
-                        </div>
-                        <div className="w-full bg-gray-900 h-1.5 rounded-full mt-1 overflow-hidden">
-                          <div className="bg-emerald-500 h-full" style={{ width: '48%' }} />
-                        </div>
-                      </div>
+                    <div className="w-full bg-gray-900 h-1.5 rounded-full mt-1 overflow-hidden">
+                      <div className="bg-emerald-500 h-full" style={{ width: '48%' }} />
                     </div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
-=======
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
         {/* Navigation Tabs */}
         <div className="flex border-b border-gray-900 gap-1 overflow-x-auto">
           <button
@@ -1412,7 +417,7 @@ export default function App() {
 
         {activeTab === 'network' && (
           <div className="space-y-6">
-            <NetworkTrafficLogs logs={networkLogs} totalBytesOut={totalBytesExchanged} />
+            <NetworkTrafficLogs logs={networkLogs} totalBytesOut={networkLogs.reduce((sum, log) => sum + log.bytesTransmitted, 0)} />
           </div>
         )}
 
@@ -1659,7 +664,7 @@ export default function App() {
                         <button
                           key={asset}
                           id={`btn-select-asset-${asset}`}
-                          onClick={() => setSelectedMonitoringAsset(asset)}
+                          onClick={() => setSelectedMonitoringAsset(asset as AssetSymbol)}
                           className={`px-2 py-1 rounded text-xs font-mono border transition ${
                             selectedMonitoringAsset === asset
                               ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-bold'
@@ -1827,7 +832,7 @@ export default function App() {
                         <div className="flex items-center justify-between text-xs font-mono font-bold border-b border-gray-800 pb-1.5">
                           <span className="text-gray-300">{exch.name} Balance</span>
                           <span className="text-emerald-400">
-                            ${(balances[exch.id]?.USDT || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
+                            ${(balances[exch.id]?.USDT || 0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits: 2 })} USDT
                           </span>
                         </div>
 
@@ -1846,7 +851,7 @@ export default function App() {
                       <p className="text-lg font-bold text-emerald-400 mt-1">
                         ${(sums.totalUsdt + sums.totalBtc * marketPrices.binance.BTC.lastPrice + sums.totalEth * marketPrices.binance.ETH.lastPrice).toLocaleString('en-US', { maximumFractionDigits: 2 })} USD
                       </p>
-                      <p className="text-[9px] text-gray-500 mt-1">Geri mühendisliği engellenmiş tekil statik binary yapısıyla borsa cüzdanları korunur.</p>
+                      <p className="text-[9px] text-gray-500 mt-1">Geri mühendisliği engellenmiş tekil statikbinary yapısıyla borsa cüzdanları korunur.</p>
                     </div>
                   </div>
                 </div>
@@ -2054,16 +1059,12 @@ export default function App() {
                 </div>
 
                 {/* Secure Environmental API Key Cryptography Store */}
-<<<<<<< HEAD
-                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-900 pb-4 gap-2">
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                        <Cpu className="w-4 h-4 text-emerald-400" />
-                        ŞİFRELİ CEX ANAHTAR HAFIZASI
-                      </h3>
-                      <p className="text-[10px] text-gray-500 mt-0.5">API keys strictly run inside client sandbox memory</p>
-                    </div>
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <div className="flex items-center justify-between border-b border-gray-900 pb-4 mb-3">
+                    <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Cpu className="w-4 h-4 text-emerald-400" />
+                      ŞİFRELİ CEX ANAHTAR HAFIZASI
+                    </h3>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -2084,7 +1085,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <p className="text-[10px] text-gray-400 font-mono leading-relaxed">
+                  <p className="text-[10px] text-gray-400 font-mono leading-relaxed mb-4">
                     Borsa bağlantılarınız için <strong>açık kaynak CCXT sürücüleri</strong> kullanılmaktadır. Anahtarlar tarayıcı local RAM belleğinde şifrelenir ve asla harici sunuculara veya izleme servislerine gönderilmez.
                   </p>
 
@@ -2121,42 +1122,6 @@ export default function App() {
                                 placeholder={`${exch.name} Secret Key`}
                               />
                             </div>
-=======
-                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
-                  <div className="flex items-center justify-between border-b border-gray-900 pb-4 mb-3">
-                    <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono">
-                      ŞİFRELİ CEX ANAHTAR HAFIZASI
-                    </h3>
-                    <button
-                      id="btn-toggle-api-keys"
-                      onClick={() => setApiKeysVisible(!apiKeysVisible)}
-                      className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono"
-                    >
-                      {apiKeysVisible ? 'GİZLE' : 'GÖSTER'}
-                    </button>
-                  </div>
-
-                  <p className="text-[10px] text-gray-500 font-mono leading-relaxed mb-4">
-                    Bu anahtarlar strictly tarayıcı ram belleğinde tutulur, asla dışarıya telemetry veya sunucu pingi ile sızdırılamaz.
-                  </p>
-
-                  <div className="space-y-3.5 font-mono text-xs">
-                    {EXCHANGES.map((exch) => {
-                      const keys = engineConfig.apiKeys[exch.id];
-                      return (
-                        <div key={exch.id} className="space-y-1 bg-black/40 border border-gray-950 p-2.5 rounded">
-                          <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold">
-                            <span>{exch.name.toUpperCase()} API ENDPOINT</span>
-                            <span className="text-emerald-500 flex items-center gap-1 text-[9px]">
-                              <Check className="w-3 h-3" /> VERIFIED LOCAL_ENV
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between bg-black p-2 rounded text-gray-300 border border-gray-900/60 overflow-hidden text-[11px]">
-                            <span className="text-gray-500 select-none shrink-0 mr-2">KEY:</span>
-                            <span className="truncate flex-1 font-mono text-gray-400">
-                              {apiKeysVisible ? keys.apiKey : '••••••••••••••••••••••••'}
-                            </span>
->>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
                           </div>
                         </div>
                       );
