@@ -171,16 +171,16 @@ export function scanOpportunities(
 
 // Generate an isolated network log
 export function createNetworkLog(
-  type: 'REST_REQ' | 'WS_FRAME' | 'DNS_LOOKUP',
-  direction: 'OUT' | 'IN',
-  endpoint: string,
-  ipAddress: string,
-  payloadSize: string
+  type: 'REST_REQ' | 'WS_FRAME' | 'DNS_LOOKUP' = 'REST_REQ',
+  direction: 'OUT' | 'IN' = 'OUT',
+  endpoint: string = '/api/orderbook',
+  ipAddress: string = '0.0.0.0',
+  payloadSize: string = '256B'
 ): NetworkConnectionLog {
   const now = new Date();
   const timeStr = `${now.toTimeString().split(' ')[0]}.${String(now.getMilliseconds()).padStart(3, '0')}`;
   const inputToHash = `${timeStr}-${endpoint}-${payloadSize}`;
-  
+
   return {
     id: `net-${Math.random().toString(36).substring(2, 7)}`,
     timestamp: timeStr,
@@ -190,7 +190,8 @@ export function createNetworkLog(
     ipAddress,
     payloadSize,
     status: 'SECURE_ISOLATED',
-    digest: generateLocalHash(inputToHash).substring(0, 32)
+    digest: generateLocalHash(inputToHash).substring(0, 32),
+    bytesTransmitted: parseInt(payloadSize) || 256
   };
 }
 

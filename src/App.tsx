@@ -63,7 +63,7 @@ export default function App() {
 
   // Market Data State
   const [marketPrices, setMarketPrices] = useState<{ [key: string]: { [key: string]: ExchangeMarketData } }>(() => {
-    return generateMarketPrices();
+    return generateMarketPrices(1, null);
   });
 
   // Opportunities State
@@ -126,17 +126,19 @@ export default function App() {
     const interval = setInterval(() => {
       setTimeSeconds(prev => prev + 1);
 
-      // Generate new market prices every 2 seconds
-      if (Math.random() > 0.7) {
-        setMarketPrices(generateMarketPrices());
+      // Generate new market prices every 3 seconds
+      if (Math.random() > 0.65) {
+        setMarketPrices(generateMarketPrices(timeSeconds, null));
       }
 
-      // Scan for opportunities
-      const newOpportunities = scanOpportunities(marketPrices, engineConfig.minArbitrageBuffer);
-      setOpportunities(newOpportunities);
+      // Scan for opportunities every 2 seconds
+      setOpportunities(prev => {
+        const newOpportunities = scanOpportunities(marketPrices, engineConfig.minArbitrageBuffer);
+        return newOpportunities.length > 0 ? newOpportunities : prev;
+      });
 
       // Create network logs for monitoring
-      if (Math.random() > 0.85) {
+      if (Math.random() > 0.88) {
         setNetworkLogs(prev => [createNetworkLog(), ...prev.slice(0, 49)]);
       }
 
@@ -152,7 +154,7 @@ export default function App() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [engineConfig, accumulatedProfitUSD]);
+  }, [engineConfig, accumulatedProfitUSD, timeSeconds, marketPrices]);
 
   // Handlers
   const toggleEngine = () => {
