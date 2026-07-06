@@ -261,10 +261,9 @@ export default function App() {
     }
   }, [engineConfig.apiKeys]);
 
-  // Auto-fetch on mount and every 60 seconds
+  // Single fetch on mount only - NO periodic refresh
   useEffect(() => {
     let isMounted = true;
-    let fetchTimer: NodeJS.Timeout;
 
     const fetchPrices = async () => {
       if (!isMounted) return;
@@ -287,15 +286,10 @@ export default function App() {
       }
     };
 
-    // Initial fetch
     fetchPrices();
-
-    // Refresh every 60 seconds
-    fetchTimer = setInterval(fetchPrices, 60000);
 
     return () => {
       isMounted = false;
-      clearInterval(fetchTimer);
     };
   }, []); // Empty dependencies - fetch only once on mount
 
