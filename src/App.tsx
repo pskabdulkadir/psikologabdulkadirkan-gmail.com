@@ -198,6 +198,7 @@ export default function App() {
   const [usePublicFeed, setUsePublicFeed] = useState<boolean>(true);
   const [publicFeedStatus, setPublicFeedStatus] = useState<'IDLE' | 'FETCHING' | 'LIVE' | 'ERROR'>('IDLE');
   const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
+  const hasInitialFetch = useRef(false);
 
   // Update market prices when live feed data arrives
   useEffect(() => {
@@ -255,8 +256,11 @@ export default function App() {
     }
   }, [engineConfig.apiKeys]);
 
-  // Initial fetch - only once on mount (not on every dependency change)
+  // Initial fetch - guaranteed to run only once
   useEffect(() => {
+    if (hasInitialFetch.current) return;
+    hasInitialFetch.current = true;
+
     let isMounted = true;
 
     const fetchPrices = async () => {
