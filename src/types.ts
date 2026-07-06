@@ -2,8 +2,11 @@ export type AssetSymbol = 'BTC' | 'ETH' | 'SOL' | 'AVAX' | 'LINK';
 
 export type EngineMode = 'HFL_BOT' | 'FALE';
 
+<<<<<<< HEAD
 export type SystemEnvironment = 'SIMULATION_DEMO' | 'SECURE_REBATE' | 'CCXT_LIVE';
 
+=======
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
 export interface ExchangeConfig {
   id: string;
   name: string;
@@ -88,7 +91,10 @@ export interface WithdrawalLog {
 export interface EngineConfig {
   isRunning: boolean;
   engineMode: EngineMode;
+<<<<<<< HEAD
   systemEnvironment: SystemEnvironment;
+=======
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
   minArbitrageBuffer: number; // The threshold margin above commission (default 0.01%)
   tradeSizeUSD: number; // Amount per trade in virtual USD
   selectedAssets: AssetSymbol[];

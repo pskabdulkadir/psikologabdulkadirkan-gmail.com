@@ -12,8 +12,11 @@ import {
   EXCHANGES, BASE_PRICES, generateMarketPrices, scanOpportunities,
   createNetworkLog, INITIAL_BALANCES, generateLocalHash
 } from './utils/engineSimulator';
+<<<<<<< HEAD
 import ccxt from 'ccxt';
 import { RuntimeAuthService, fetchPublicMarketData, runOrderbookAnalytics } from './utils/ccxtService';
+=======
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
 import ZeroTrustContract from './components/ZeroTrustContract';
 import NetworkTrafficLogs from './components/NetworkTrafficLogs';
 import BinaryCompilerView from './components/BinaryCompilerView';
@@ -46,7 +49,10 @@ export default function App() {
     return {
       isRunning: false,
       engineMode: 'HFL_BOT', // Default is HFL Mode
+<<<<<<< HEAD
       systemEnvironment: 'SIMULATION_DEMO',
+=======
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
       minArbitrageBuffer: 0.01, // 0.01% standard limit requested
       tradeSizeUSD: 5000.00, // standard virtual order sizing
       selectedAssets: ['BTC', 'ETH', 'SOL', 'AVAX', 'LINK'],
@@ -119,6 +125,7 @@ export default function App() {
 
   const [rebateEarnedUSD, setRebateEarnedUSD] = useState<number>(() => {
     const saved = localStorage.getItem('secure_rebate_earned');
+<<<<<<< HEAD
     return saved ? parseFloat(saved) : 10.00; // Default $10.00 activation bonus as requested for rebate verification
   });
 
@@ -134,6 +141,11 @@ export default function App() {
     localStorage.setItem('secure_referral_ids', JSON.stringify(referralIds));
   }, [referralIds]);
 
+=======
+    return saved ? parseFloat(saved) : 0;
+  });
+
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
   const [totalBytesExchanged, setTotalBytesExchanged] = useState<number>(31240); // seed bytes
   const [selectedMonitoringAsset, setSelectedMonitoringAsset] = useState<AssetSymbol>('BTC');
 
@@ -175,6 +187,7 @@ export default function App() {
   const [apiKeysVisible, setApiKeysVisible] = useState<boolean>(false);
   const [settingsSavedMessage, setSettingsSavedMessage] = useState<string>('');
 
+<<<<<<< HEAD
   const [usePublicFeed, setUsePublicFeed] = useState<boolean>(true);
   const [publicFeedStatus, setPublicFeedStatus] = useState<'IDLE' | 'FETCHING' | 'LIVE' | 'ERROR'>('IDLE');
   const [lastFetchedPrices, setLastFetchedPrices] = useState<Record<AssetSymbol, number> | null>(null);
@@ -244,6 +257,8 @@ export default function App() {
     setTimeout(() => setSettingsSavedMessage(''), 4000);
   };
 
+=======
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
   // UI state alerts
   const [isProfitLocked, setIsProfitLocked] = useState<boolean>(false);
 
@@ -423,7 +438,11 @@ export default function App() {
 
   // Sync market prices & analyze opportunities on tick
   useEffect(() => {
+<<<<<<< HEAD
     const newPrices = generateMarketPrices(timeSeconds, marketPrices, usePublicFeed ? lastFetchedPrices : null);
+=======
+    const newPrices = generateMarketPrices(timeSeconds, marketPrices);
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
     setMarketPrices(newPrices);
 
     // Scan for opportunities
@@ -462,6 +481,7 @@ export default function App() {
     const buyExId = EXCHANGES.find(e => e.name === opp.buyExchange)?.id || 'binance';
     const sellExId = EXCHANGES.find(e => e.name === opp.sellExchange)?.id || 'okx';
 
+<<<<<<< HEAD
     const tradeUSDAmount = engineConfig.tradeSizeUSD;
     const currentBuyExUSDTBalance = balances[buyExId]?.USDT || 0;
 
@@ -470,11 +490,23 @@ export default function App() {
       return;
     }
 
+=======
+    // Verify virtual balance sufficiency
+    const tradeUSDAmount = engineConfig.tradeSizeUSD;
+    const currentBuyExUSDTBalance = balances[buyExId]?.USDT || 0;
+
+    if (currentBuyExUSDTBalance < tradeUSDAmount) {
+      return;
+    }
+
+    // Microsecond latencies calculations
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
     const buyEx = EXCHANGES.find(e => e.id === buyExId)!;
     const sellEx = EXCHANGES.find(e => e.id === sellExId)!;
     const buyLatency = Math.floor(Math.random() * (buyEx.latencyMax - buyEx.latencyMin) + buyEx.latencyMin);
     const sellLatency = Math.floor(Math.random() * (sellEx.latencyMax - sellEx.latencyMin) + sellEx.latencyMin);
 
+<<<<<<< HEAD
     const assetQuantity = tradeUSDAmount / opp.buyPrice;
     const buyFee = assetQuantity * opp.buyPrice * buyEx.takerFee;
 
@@ -535,6 +567,40 @@ export default function App() {
       sellTxHash = generateLocalHash(sellOrderId);
     }
 
+=======
+    // Execute Asset Buy Order
+    const assetQuantity = tradeUSDAmount / opp.buyPrice;
+    const buyFee = assetQuantity * opp.buyPrice * buyEx.takerFee;
+
+    // Execute Asset Sell Order
+    const sellRevenueUSD = assetQuantity * opp.sellPrice;
+    const sellFee = sellRevenueUSD * sellEx.takerFee;
+
+    // Calculate absolute profit in USDT
+    const profitUSDT = sellRevenueUSD - tradeUSDAmount - (buyFee + sellFee);
+
+    // Calculate volume rebate: simulated commission back (e.g. 0.05% of traded volume)
+    const rebateUSDT = (tradeUSDAmount * 0.0005);
+
+    // Update balances
+    setBalances((prev) => {
+      const updated = JSON.parse(JSON.stringify(prev));
+      // Deduct USDT, add asset on Buying CEX
+      updated[buyExId].USDT = Number((updated[buyExId].USDT - tradeUSDAmount).toFixed(2));
+      updated[buyExId][opp.asset] = Number((updated[buyExId][opp.asset] + assetQuantity).toFixed(4));
+
+      // Deduct asset, add USDT on Selling CEX
+      updated[sellExId][opp.asset] = Number((updated[sellExId][opp.asset] - assetQuantity).toFixed(4));
+      updated[sellExId].USDT = Number((updated[sellExId].USDT + sellRevenueUSD - sellFee).toFixed(2));
+
+      return updated;
+    });
+
+    // Create Order Logs
+    const buyOrderId = `ord-buy-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const sellOrderId = `ord-sell-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
     const buyLog: OrderLog = {
       id: buyOrderId,
       timestamp: Date.now(),
@@ -543,11 +609,19 @@ export default function App() {
       exchange: opp.buyExchange,
       price: opp.buyPrice,
       quantity: Number(assetQuantity.toFixed(4)),
+<<<<<<< HEAD
       fee: engineConfig.systemEnvironment === 'SECURE_REBATE' ? 0 : Number(buyFee.toFixed(4)), // 0 fee in zero-balance affiliate mode
       feeAsset: 'USDT',
       latencyUs: buyLatency,
       status: statusText,
       txHash: buyTxHash
+=======
+      fee: Number(buyFee.toFixed(4)),
+      feeAsset: 'USDT',
+      latencyUs: buyLatency,
+      status: 'COMPLETED',
+      txHash: generateLocalHash(buyOrderId)
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
     };
 
     const sellLog: OrderLog = {
@@ -558,15 +632,24 @@ export default function App() {
       exchange: opp.sellExchange,
       price: opp.sellPrice,
       quantity: Number(assetQuantity.toFixed(4)),
+<<<<<<< HEAD
       fee: engineConfig.systemEnvironment === 'SECURE_REBATE' ? 0 : Number(sellFee.toFixed(4)),
       feeAsset: 'USDT',
       latencyUs: sellLatency,
       status: statusText,
       txHash: sellTxHash
+=======
+      fee: Number(sellFee.toFixed(4)),
+      feeAsset: 'USDT',
+      latencyUs: sellLatency,
+      status: 'COMPLETED',
+      txHash: generateLocalHash(sellOrderId)
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
     };
 
     setOrderLogs((prev) => [sellLog, buyLog, ...prev].slice(0, 40));
 
+<<<<<<< HEAD
     // 3. Network logging
     let buyEndpoint = '';
     let sellEndpoint = '';
@@ -596,13 +679,24 @@ export default function App() {
       'REST_REQ',
       'OUT',
       buyEndpoint,
+=======
+    // Update Network logs for CEX Orders
+    const buyNetLog = createNetworkLog(
+      'REST_REQ',
+      'OUT',
+      `https://api.${buyExId}.com/api/v3/order?symbol=${opp.asset}USDT&side=BUY`,
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
       buyEx.ipAddress,
       '512 bytes'
     );
     const sellNetLog = createNetworkLog(
       'REST_REQ',
       'OUT',
+<<<<<<< HEAD
       sellEndpoint,
+=======
+      `https://api.${sellExId}.com/api/v1/trade/order?symbol=${opp.asset}-USDT&side=SELL`,
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
       sellEx.ipAddress,
       '512 bytes'
     );
@@ -610,6 +704,7 @@ export default function App() {
     setNetworkLogs((prev) => [sellNetLog, buyNetLog, ...prev].slice(0, 50));
     setTotalBytesExchanged((prev) => prev + 1024);
 
+<<<<<<< HEAD
     // 4. Update counters
     setTotalTradesExecuted((prev) => prev + 2);
 
@@ -641,6 +736,35 @@ export default function App() {
       if (engineConfig.engineMode === 'FALE' && nextProfit >= engineConfig.autoWithdrawThresholdUSD) {
         triggerAutonomousWithdrawal(nextProfit);
       }
+=======
+    // Update general cumulative counters
+    setTotalTradesExecuted((prev) => prev + 2);
+    setRebateEarnedUSD((prev) => Number((prev + rebateUSDT).toFixed(4)));
+
+    // Handle Profit Accrual & Threshold Checks
+    const nextProfit = Number((accumulatedProfitUSD + profitUSDT).toFixed(4));
+    setAccumulatedProfitUSD(nextProfit);
+
+    // HFL_BOT Mode: Profit Lock Trigger
+    if (engineConfig.engineMode === 'HFL_BOT' && nextProfit >= engineConfig.profitLockThresholdUSD) {
+      setIsProfitLocked(true);
+      setEngineConfig((prev) => ({ ...prev, isRunning: false }));
+
+      // Create local network log stating block lock
+      const lockLog = createNetworkLog(
+        'REST_REQ',
+        'IN',
+        `https://local.bot/api/v1/profit-lock?reached=${nextProfit}`,
+        '127.0.0.1',
+        '0 bytes'
+      );
+      setNetworkLogs((prev) => [lockLog, ...prev]);
+    }
+
+    // FALE Mode: Auto-Withdraw Trigger
+    if (engineConfig.engineMode === 'FALE' && nextProfit >= engineConfig.autoWithdrawThresholdUSD) {
+      triggerAutonomousWithdrawal(nextProfit);
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
     }
   };
 
@@ -1026,6 +1150,7 @@ export default function App() {
           </div>
         )}
         
+<<<<<<< HEAD
         {/* Sistem Entegrasyon ve Çalışma Kanalı Seçim Paneli */}
         <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 font-sans relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -1228,6 +1353,8 @@ export default function App() {
           </div>
         </div>
 
+=======
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
         {/* Navigation Tabs */}
         <div className="flex border-b border-gray-900 gap-1 overflow-x-auto">
           <button
@@ -1927,6 +2054,7 @@ export default function App() {
                 </div>
 
                 {/* Secure Environmental API Key Cryptography Store */}
+<<<<<<< HEAD
                 <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-900 pb-4 gap-2">
                     <div>
@@ -1993,6 +2121,42 @@ export default function App() {
                                 placeholder={`${exch.name} Secret Key`}
                               />
                             </div>
+=======
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <div className="flex items-center justify-between border-b border-gray-900 pb-4 mb-3">
+                    <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono">
+                      ŞİFRELİ CEX ANAHTAR HAFIZASI
+                    </h3>
+                    <button
+                      id="btn-toggle-api-keys"
+                      onClick={() => setApiKeysVisible(!apiKeysVisible)}
+                      className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono"
+                    >
+                      {apiKeysVisible ? 'GİZLE' : 'GÖSTER'}
+                    </button>
+                  </div>
+
+                  <p className="text-[10px] text-gray-500 font-mono leading-relaxed mb-4">
+                    Bu anahtarlar strictly tarayıcı ram belleğinde tutulur, asla dışarıya telemetry veya sunucu pingi ile sızdırılamaz.
+                  </p>
+
+                  <div className="space-y-3.5 font-mono text-xs">
+                    {EXCHANGES.map((exch) => {
+                      const keys = engineConfig.apiKeys[exch.id];
+                      return (
+                        <div key={exch.id} className="space-y-1 bg-black/40 border border-gray-950 p-2.5 rounded">
+                          <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold">
+                            <span>{exch.name.toUpperCase()} API ENDPOINT</span>
+                            <span className="text-emerald-500 flex items-center gap-1 text-[9px]">
+                              <Check className="w-3 h-3" /> VERIFIED LOCAL_ENV
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between bg-black p-2 rounded text-gray-300 border border-gray-900/60 overflow-hidden text-[11px]">
+                            <span className="text-gray-500 select-none shrink-0 mr-2">KEY:</span>
+                            <span className="truncate flex-1 font-mono text-gray-400">
+                              {apiKeysVisible ? keys.apiKey : '••••••••••••••••••••••••'}
+                            </span>
+>>>>>>> e7e5d722830e7a83bf0c8c96c37fe56df402cd76
                           </div>
                         </div>
                       );
