@@ -3,7 +3,6 @@ export type AssetSymbol = 'BTC' | 'ETH' | 'SOL' | 'AVAX' | 'LINK';
 export type EngineMode = 'HFL_BOT' | 'FALE';
 
 export type SystemEnvironment = 'SIMULATION_DEMO' | 'SECURE_REBATE' | 'CCXT_LIVE';
-
 export interface ExchangeConfig {
   id: string;
   name: string;

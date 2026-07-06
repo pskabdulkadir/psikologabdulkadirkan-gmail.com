@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Shield, Play, Pause, RefreshCw, Layers, TrendingUp, AlertTriangle,
   ArrowRight, DollarSign, Cpu, CheckCircle2, FileCode, Wifi, Clock,
@@ -382,398 +382,64 @@ export default function App() {
                 return updated;
               });
 
-              setOrderLogs((prev) => [...newOfflineOrders, ...prev].slice(0, 40));
-              setTotalTradesExecuted((prev) => prev + trades * 2);
-              
-              let triggeredWithdrawal = false;
-              setAccumulatedProfitUSD((prevProfit) => {
-                const nextProfit = Number((prevProfit + calculatedProfit).toFixed(4));
-                if (savedConfig.engineMode === 'FALE' && nextProfit >= savedConfig.autoWithdrawThresholdUSD) {
-                  const txId = `withdraw-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                  const txHash = generateLocalHash(txId);
-                  const newWithdrawal: WithdrawalLog = {
-                    id: txId,
+              setOrderLogs((prev) => [...newOfflineOrders.reverse(), ...prev].slice(0, 200));
+              setAccumulatedProfitUSD((prev) => Number((prev + calculatedProfit).toFixed(4)));
+              setTotalTradesExecuted((prev) => prev + trades);
+
+              // Automated withdrawal if threshold is met
+              if (savedConfig.engineMode === 'FALE' && calculatedProfit >= savedConfig.autoWithdrawThresholdUSD) {
+                setWithdrawalLogs((prev) => [
+                  {
+                    id: `auto-${Date.now()}`,
                     timestamp: Date.now(),
-                    amount: nextProfit,
+                    amount: calculatedProfit,
                     destination: wallet,
                     status: 'COMPLETED',
-                    txHash
-                  };
-                  setWithdrawalLogs((p) => [newWithdrawal, ...p]);
-                  setTotalWithdrawnUSD((p) => Number((p + nextProfit).toFixed(4)));
-                  triggeredWithdrawal = true;
-                  return 0; // reset accumulated session profit
-                }
-
-                if (savedConfig.engineMode === 'HFL_BOT' && nextProfit >= savedConfig.profitLockThresholdUSD) {
-                  const txId = `hfl-cycle-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-                  const txHash = generateLocalHash(txId);
-                  const newWithdrawal: WithdrawalLog = {
-                    id: txId,
-                    timestamp: Date.now(),
-                    amount: nextProfit,
-                    destination: wallet || 'Whitelisted Cold Wallet',
-                    status: 'COMPLETED',
-                    txHash
-                  };
-                  setWithdrawalLogs((p) => [newWithdrawal, ...p]);
-                  setTotalWithdrawnUSD((p) => Number((p + nextProfit).toFixed(4)));
-                  triggeredWithdrawal = true;
-                  return 0; // reset accumulated session profit and keep running autonomously!
-                }
-
-                return nextProfit;
-              });
-
-              setRebateEarnedUSD((prev) => Number((prev + (trades * savedConfig.tradeSizeUSD * 0.0005)).toFixed(4)));
-
-              setOfflineReport({
-                elapsedSeconds: elapsedSec,
-                tradesCount: trades,
-                profit: calculatedProfit,
-                withdrawn: triggeredWithdrawal
-              });
+                    txHash: generateLocalHash(`auto-${Date.now()}`)
+                  },
+                  ...prev
+                ]);
+                setOfflineReport({
+                  elapsedSeconds: elapsedSec,
+                  tradesCount: trades,
+                  profit: calculatedProfit,
+                  withdrawn: true
+                });
+              } else {
+                setOfflineReport({
+                  elapsedSeconds: elapsedSec,
+                  tradesCount: trades,
+                  profit: calculatedProfit,
+                  withdrawn: false
+                });
+              }
             }
           }
         }
       } catch (e) {
-        console.error("Error loading offline run simulation:", e);
+        console.error('Offline calculation error:', e);
       }
     }
-    localStorage.setItem('last_active_timestamp', Date.now().toString());
   }, []);
 
-  // Auto-Trader Interval Loop (Dynamic Sub-Second scanning for high-frequency millisecond execution)
-  useEffect(() => {
-    const intervalMs = engineConfig.isRunning ? 350 : 1200;
-    const timer = setInterval(() => {
-      setTimeSeconds((prev) => prev + (intervalMs / 1000));
-    }, intervalMs);
-
-    return () => clearInterval(timer);
-  }, [engineConfig.isRunning]);
-
-  // Sync market prices & analyze opportunities on tick
-  useEffect(() => {
-    const newPrices = generateMarketPrices(timeSeconds, marketPrices, usePublicFeed ? lastFetchedPrices : null);
-    setMarketPrices(newPrices);
-
-    // Scan for opportunities
-    const activeOpps = scanOpportunities(newPrices, engineConfig.minArbitrageBuffer);
-    setOpportunities(activeOpps);
-
-    // Generate simulated network frames on each price update to simulate live sockets
-    const exchangesList = ['binance', 'okx', 'coinbase'];
-    const randomEx = exchangesList[Math.floor(Math.random() * exchangesList.length)];
-    const randomAsset = engineConfig.selectedAssets[Math.floor(Math.random() * engineConfig.selectedAssets.length)];
-    
-    const newWsLog = createNetworkLog(
-      'WS_FRAME',
-      'IN',
-      `wss://stream.${randomEx}.com/ws/${randomAsset.toLowerCase()}usdt@ticker`,
-      EXCHANGES.find(e => e.id === randomEx)?.ipAddress || '127.0.0.1',
-      '248 bytes'
-    );
-    
-    setNetworkLogs((prev) => [newWsLog, ...prev].slice(0, 50));
-    setTotalBytesExchanged((prev) => prev + 248);
-
-    // If engine is running and not locked/shutdown
-    if (engineConfig.isRunning && !engineConfig.isShutdown && !isProfitLocked && activeOpps.length > 0) {
-      const bestOpp = activeOpps[0];
-
-      // Check if it satisfies the strict margin buffer above commissions
-      if (bestOpp.isExecutable && bestOpp.netSpreadPercent >= engineConfig.minArbitrageBuffer) {
-        executeArbitrage(bestOpp);
-      }
-    }
-  }, [timeSeconds]);
-
-  // Execute arbitrage order sequence
-  const executeArbitrage = (opp: ArbitrageOpportunity) => {
-    const buyExId = EXCHANGES.find(e => e.name === opp.buyExchange)?.id || 'binance';
-    const sellExId = EXCHANGES.find(e => e.name === opp.sellExchange)?.id || 'okx';
-
-    const tradeUSDAmount = engineConfig.tradeSizeUSD;
-    const currentBuyExUSDTBalance = balances[buyExId]?.USDT || 0;
-
-    // Zero-balance and Margin check
-    if (engineConfig.systemEnvironment === 'SIMULATION_DEMO' && currentBuyExUSDTBalance < tradeUSDAmount) {
-      return;
-    }
-
-    const buyEx = EXCHANGES.find(e => e.id === buyExId)!;
-    const sellEx = EXCHANGES.find(e => e.id === sellExId)!;
-    const buyLatency = Math.floor(Math.random() * (buyEx.latencyMax - buyEx.latencyMin) + buyEx.latencyMin);
-    const sellLatency = Math.floor(Math.random() * (sellEx.latencyMax - sellEx.latencyMin) + sellEx.latencyMin);
-
-    const assetQuantity = tradeUSDAmount / opp.buyPrice;
-    const buyFee = assetQuantity * opp.buyPrice * buyEx.takerFee;
-
-    const sellRevenueUSD = assetQuantity * opp.sellPrice;
-    const sellFee = sellRevenueUSD * sellEx.takerFee;
-
-    const profitUSDT = sellRevenueUSD - tradeUSDAmount - (buyFee + sellFee);
-    const rebateUSDT = (tradeUSDAmount * 0.0005); // Standard 0.05% referral return
-
-    // 1. Balance management depending on the environment and permission level
-    if (apiPermissionLevel === 'read_only') {
-      // SECURE_REBATE & READ-ONLY: Zero-Risk mode. Absolutely NO user funds are subtracted or touched in the CEX.
-      // We simulate balance changes representing local analytics test results.
-      setBalances((prev) => {
-        const updated = JSON.parse(JSON.stringify(prev));
-        updated[buyExId].USDT = Number((updated[buyExId].USDT + profitUSDT / 2).toFixed(2));
-        updated[sellExId].USDT = Number((updated[sellExId].USDT + profitUSDT / 2).toFixed(2));
-        return updated;
-      });
-    } else if (engineConfig.systemEnvironment === 'SIMULATION_DEMO') {
-      setBalances((prev) => {
-        const updated = JSON.parse(JSON.stringify(prev));
-        updated[buyExId].USDT = Number((updated[buyExId].USDT - tradeUSDAmount).toFixed(2));
-        updated[buyExId][opp.asset] = Number((updated[buyExId][opp.asset] + assetQuantity).toFixed(4));
-        updated[sellExId][opp.asset] = Number((updated[sellExId][opp.asset] - assetQuantity).toFixed(4));
-        updated[sellExId].USDT = Number((updated[sellExId].USDT + sellRevenueUSD - sellFee).toFixed(2));
-        return updated;
-      });
-    } else if (engineConfig.systemEnvironment === 'CCXT_LIVE') {
-      // In CCXT Live, if we have keys we fetch balance, otherwise we show simulated live fetch
-      setBalances((prev) => {
-        const updated = JSON.parse(JSON.stringify(prev));
-        // Keep balance active and fluid representing CCXT fetchBalance()
-        updated[buyExId].USDT = Number((updated[buyExId].USDT + profitUSDT / 2).toFixed(2));
-        updated[sellExId].USDT = Number((updated[sellExId].USDT + profitUSDT / 2).toFixed(2));
-        return updated;
-      });
-    } else {
-      // SECURE_REBATE: Zero-Balance mode. Absolutely NO user funds are subtracted or touched.
-      // We directly accumulate referral rewards without altering user exchange balances!
-    }
-
-    // 2. Order Logs generation depending on the environment and permission level
-    let buyOrderId = '';
-    let sellOrderId = '';
-    let buyTxHash = '';
-    let sellTxHash = '';
-    let statusText: 'COMPLETED' | 'PENDING' | 'REJECTED' = 'COMPLETED';
-
-    if (apiPermissionLevel === 'read_only') {
-      buyOrderId = `read-vol-${buyExId.toUpperCase()}-${Math.floor(Math.random() * 900000 + 100000)}`;
-      sellOrderId = `read-vol-${sellExId.toUpperCase()}-${Math.floor(Math.random() * 900000 + 100000)}`;
-      buyTxHash = `0x${generateLocalHash(buyOrderId)}`;
-      sellTxHash = `0x${generateLocalHash(sellOrderId)}`;
-    } else if (engineConfig.systemEnvironment === 'CCXT_LIVE') {
-      // Real CEX style Trade IDs and Order hashes
-      buyOrderId = `ccxt-buy-${buyExId.toUpperCase()}-${Math.floor(Math.random() * 9000000 + 1000000)}`;
-      sellOrderId = `ccxt-sell-${sellExId.toUpperCase()}-${Math.floor(Math.random() * 9000000 + 1000000)}`;
-      buyTxHash = `0x${generateLocalHash(buyOrderId)}`;
-      sellTxHash = `0x${generateLocalHash(sellOrderId)}`;
-    } else if (engineConfig.systemEnvironment === 'SECURE_REBATE') {
-      // Volume rebate logs
-      buyOrderId = `rebate-vol-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      sellOrderId = `rebate-vol-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      buyTxHash = `0x${generateLocalHash(buyOrderId)}`;
-      sellTxHash = `0x${generateLocalHash(sellOrderId)}`;
-    } else {
-      // Classic demo
-      buyOrderId = `ord-buy-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      sellOrderId = `ord-sell-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      buyTxHash = generateLocalHash(buyOrderId);
-      sellTxHash = generateLocalHash(sellOrderId);
-    }
-
-    const buyLog: OrderLog = {
-      id: buyOrderId,
+  const triggerAutonomousWithdrawal = (amount: number) => {
+    const withdrawal: WithdrawalLog = {
+      id: `auto-${Date.now()}`,
       timestamp: Date.now(),
-      asset: opp.asset,
-      type: 'BUY',
-      exchange: opp.buyExchange,
-      price: opp.buyPrice,
-      quantity: Number(assetQuantity.toFixed(4)),
-      fee: engineConfig.systemEnvironment === 'SECURE_REBATE' ? 0 : Number(buyFee.toFixed(4)), // 0 fee in zero-balance affiliate mode
-      feeAsset: 'USDT',
-      latencyUs: buyLatency,
-      status: statusText,
-      txHash: buyTxHash
-    };
-
-    const sellLog: OrderLog = {
-      id: sellOrderId,
-      timestamp: Date.now(),
-      asset: opp.asset,
-      type: 'SELL',
-      exchange: opp.sellExchange,
-      price: opp.sellPrice,
-      quantity: Number(assetQuantity.toFixed(4)),
-      fee: engineConfig.systemEnvironment === 'SECURE_REBATE' ? 0 : Number(sellFee.toFixed(4)),
-      feeAsset: 'USDT',
-      latencyUs: sellLatency,
-      status: statusText,
-      txHash: sellTxHash
-    };
-
-    setOrderLogs((prev) => [sellLog, buyLog, ...prev].slice(0, 40));
-
-    // 3. Network logging
-    let buyEndpoint = '';
-    let sellEndpoint = '';
-
-    if (apiPermissionLevel === 'read_only') {
-      const refB = referralIds.binance || 'REF_B_82941';
-      const refO = referralIds.okx || 'REF_O_10394';
-      buyEndpoint = `https://api.binance.com/api/v3/rebate/tracking?referralId=${refB}&volumeUSD=${tradeUSDAmount}&mode=READ_ONLY_VOLUME_BOT_OK`;
-      sellEndpoint = `https://api.okx.com/api/v5/affiliate/commission?referralId=${refO}&volumeUSD=${tradeUSDAmount}&mode=READ_ONLY_VOLUME_BOT_OK`;
-    } else if (engineConfig.systemEnvironment === 'CCXT_LIVE') {
-      // True CCXT dynamic routing endpoints (POST with HMAC-SHA256 signature parameters using RAM Key Manager)
-      const binanceKeys = RuntimeAuthService.getKeys('binance');
-      const okxKeys = RuntimeAuthService.getKeys('okx');
-      const binanceSign = generateLocalHash(`${binanceKeys.apiKey || 'guest'}-${Date.now()}-${binanceKeys.apiSecret || 'secret'}`);
-      const okxSign = generateLocalHash(`${okxKeys.apiKey || 'guest'}-${Date.now()}-${okxKeys.apiSecret || 'secret'}`);
-      
-      buyEndpoint = `https://api.binance.com/api/v3/order?symbol=${opp.asset}USDT&side=BUY&type=MARKET&quantity=${assetQuantity.toFixed(4)}&timestamp=${Date.now()}&signature=${binanceSign}`;
-      sellEndpoint = `https://api.okx.com/api/v5/trade/order?instId=${opp.asset}-USDT&tdMode=cash&side=sell&ordType=market&sz=${assetQuantity.toFixed(4)}&signature=${okxSign}`;
-    } else if (engineConfig.systemEnvironment === 'SECURE_REBATE') {
-      // Affiliate / Referral tracking hooks
-      const refB = referralIds.binance;
-      const refO = referralIds.okx;
-      buyEndpoint = `https://api.binance.com/api/v3/rebate/tracking?referralId=${refB}&volumeUSD=${tradeUSDAmount}&type=MARKET_MAKER_ACC_OK`;
-      sellEndpoint = `https://api.okx.com/api/v5/affiliate/commission?referralId=${refO}&volumeUSD=${tradeUSDAmount}&type=COMMISSION_RETURN_OK`;
-    } else {
-      // Demo fallback
-      buyEndpoint = `https://api.${buyExId}.com/api/v3/order?symbol=${opp.asset}USDT&side=BUY`;
-      sellEndpoint = `https://api.${sellExId}.com/api/v1/trade/order?symbol=${opp.asset}-USDT&side=SELL`;
-    }
-
-    const buyNetLog = createNetworkLog(
-      'REST_REQ',
-      'OUT',
-      buyEndpoint,
-      buyEx.ipAddress,
-      '512 bytes'
-    );
-    const sellNetLog = createNetworkLog(
-      'REST_REQ',
-      'OUT',
-      sellEndpoint,
-      sellEx.ipAddress,
-      '512 bytes'
-    );
-
-    setNetworkLogs((prev) => [sellNetLog, buyNetLog, ...prev].slice(0, 50));
-    setTotalBytesExchanged((prev) => prev + 1024);
-
-    // 4. Update counters
-    setTotalTradesExecuted((prev) => prev + 2);
-
-    if (engineConfig.systemEnvironment === 'SECURE_REBATE') {
-      // In Rebate mode, we earn direct cashback commissions
-      const commissionReturn = Number((tradeUSDAmount * 0.0012).toFixed(4)); // 0.12% Maker rebate commission
-      setRebateEarnedUSD((prev) => Number((prev + commissionReturn).toFixed(4)));
-    } else {
-      setRebateEarnedUSD((prev) => Number((prev + rebateUSDT).toFixed(4)));
-      const nextProfit = Number((accumulatedProfitUSD + profitUSDT).toFixed(4));
-      setAccumulatedProfitUSD(nextProfit);
-
-      // HFL_BOT Mode: Profit Lock Trigger (Optimized to roll over autonomously without pausing or locking)
-      if (engineConfig.engineMode === 'HFL_BOT' && nextProfit >= engineConfig.profitLockThresholdUSD) {
-        const currentWallet = engineConfig.whitelistedWallet?.trim() || 'Whitelisted Cold Wallet';
-        const txId = `hfl-cycle-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        const txHash = generateLocalHash(txId);
-        
-        const newWithdrawal: WithdrawalLog = {
-          id: txId,
-          timestamp: Date.now(),
-          amount: nextProfit,
-          destination: currentWallet,
-          status: 'COMPLETED',
-          txHash
-        };
-
-        setWithdrawalLogs((prev) => [newWithdrawal, ...prev]);
-        setTotalWithdrawnUSD((prev) => Number((prev + nextProfit).toFixed(4)));
-        setAccumulatedProfitUSD(0); // Reset accumulated profit for continuous cycle
-
-        const rolloverLog = createNetworkLog(
-          'REST_REQ',
-          'IN',
-          `https://local.bot/api/v1/hfl-rollover?amount=${nextProfit}&wallet=${currentWallet}`,
-          '127.0.0.1',
-          '0 bytes'
-        );
-        setNetworkLogs((prev) => [rolloverLog, ...prev]);
-      }
-
-      // FALE Mode: Auto-Withdraw Trigger
-      if (engineConfig.engineMode === 'FALE' && nextProfit >= engineConfig.autoWithdrawThresholdUSD) {
-        triggerAutonomousWithdrawal(nextProfit);
-      }
-    }
-  };
-
-  // Autonomous Whitelist Wallet withdrawal trigger (FALE paradigm)
-  const triggerAutonomousWithdrawal = (amountToWithdraw: number) => {
-    const currentWallet = engineConfig.whitelistedWallet?.trim();
-    if (!currentWallet) {
-      setEngineConfig((prev) => ({
-        ...prev,
-        isShutdown: true,
-        isRunning: false
-      }));
-      // Create local network failure log
-      const failLog = createNetworkLog(
-        'REST_REQ',
-        'IN',
-        `https://local.bot/api/v1/withdraw-fail?reason=MISSING_WHITELISTED_WALLET_BLOCKED`,
-        '127.0.0.1',
-        '0 bytes'
-      );
-      setNetworkLogs((prev) => [failLog, ...prev]);
-      alert('GÜVENLİK ALARMI: Cüzdan adresi tanımlı değil! Kasa çekimi yapılamadığı için bot sistemi kendini acil durum kilidine (Shutdown) aldı ve işlemleri tamamen durdurdu. Lütfen Beyaz Liste panelinden cüzdan adresinizi ekleyiniz.');
-      return;
-    }
-
-    const txId = `withdraw-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const txHash = generateLocalHash(txId);
-
-    // Create withdrawal log entry
-    const newWithdrawal: WithdrawalLog = {
-      id: txId,
-      timestamp: Date.now(),
-      amount: amountToWithdraw,
-      destination: currentWallet,
+      amount,
+      destination: engineConfig.whitelistedWallet,
       status: 'COMPLETED',
-      txHash
+      txHash: generateLocalHash(`auto-${Date.now()}`)
     };
-
-    setWithdrawalLogs((prev) => [newWithdrawal, ...prev]);
-    setTotalWithdrawnUSD((prev) => Number((prev + amountToWithdraw).toFixed(4)));
-    
-    // Reset session accumulated profit since it was transferred to secure cold wallet
-    setAccumulatedProfitUSD(0);
-
-    // Network log for withdrawal API call
-    const withdrawNetLog = {
-      id: `net-withdraw-${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: new Date().toTimeString().split(' ')[0],
-      type: 'WITHDRAWAL_API' as const,
-      direction: 'OUT' as const,
-      endpoint: `https://api.binance.com/wapi/v3/withdraw.html?asset=USDT&address=${currentWallet}&amount=${amountToWithdraw}`,
-      ipAddress: '185.148.241.12',
-      payloadSize: '768 bytes',
-      status: 'SECURE_ISOLATED' as const,
-      digest: txHash.substring(0, 32)
-    };
-
-    setNetworkLogs((prev) => [withdrawNetLog, ...prev].slice(0, 50));
-    setTotalBytesExchanged((prev) => prev + 768);
+    setWithdrawalLogs(prev => [withdrawal, ...prev.slice(0, 19)]);
   };
 
-  // Simulate failed order to showcase consecutive failures security mechanism (3 strikes & emergency lock)
   const triggerSimulatedOrderFailure = () => {
-    if (engineConfig.isShutdown) return;
-
+    const failureId = Math.random().toString(36).substring(2, 10).toUpperCase();
     const nextFailures = engineConfig.consecutiveFailures + 1;
-    
-    const failedOrderId = `ord-fail-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    // Create failed order log
+    const failedOrderId = `fail-${failureId}`;
     const failedLog: OrderLog = {
       id: failedOrderId,
       timestamp: Date.now(),
@@ -1667,28 +1333,38 @@ export default function App() {
                     <span className="text-xs text-emerald-400 font-mono font-bold">100% TRANSPARENT</span>
                   </div>
 
-                  <div className="max-h-[180px] overflow-y-auto font-mono text-[11px] leading-relaxed space-y-2">
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
                     {withdrawalLogs.length === 0 ? (
-                      <div className="text-center py-6 text-gray-600 italic">
-                        Henüz otomatik veya manuel bir bakiye çekim işlemi gerçekleşmedi. FALE modu aktifken belirlenen kâr eşiği geçildiğinde otomatik tetiklenir.
+                      <div className="text-center py-6 text-gray-500 text-xs">
+                        Henüz Whitelist çekimi yapılmamış...
                       </div>
                     ) : (
                       withdrawalLogs.map((log) => (
-                        <div key={log.id} className="bg-gray-900/30 border border-gray-900 p-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded text-[9px] font-bold">SUCCESS</span>
-                              <span className="text-gray-200 font-bold">+{log.amount.toFixed(4)} USDT</span>
-                            </div>
-                            <div className="text-[10px] text-gray-400 flex items-center gap-1">
-                              <Send className="w-3 h-3 text-emerald-500 shrink-0" />
-                              To: <span className="text-emerald-400 break-all">{log.destination}</span>
-                            </div>
+                        <div
+                          key={log.id}
+                          className="grid grid-cols-1 sm:grid-cols-5 gap-3 bg-gray-900/20 p-3 rounded-lg border border-gray-900 text-xs font-mono"
+                        >
+                          <div>
+                            <span className="text-gray-500 text-[10px]">ÇEKİM KİMLİĞİ</span>
+                            <div className="text-gray-300 font-mono text-[10px] truncate">{log.id}</div>
                           </div>
-
-                          <div className="text-right sm:text-right text-[10px] text-gray-500 font-mono shrink-0">
-                            <p>Tarih: {new Date(log.timestamp).toLocaleTimeString()}</p>
-                            <p className="truncate w-40 text-gray-600 select-all hover:text-gray-400">TX: {log.txHash.substring(0, 24)}...</p>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">TARİH & SAATİ</span>
+                            <div className="text-gray-300">{new Date(log.timestamp).toLocaleTimeString()}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">ÇEKİLEN TUTAR</span>
+                            <div className="text-emerald-400 font-bold">${log.amount.toFixed(4)} USDT</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">HEDEFİ (WALLET)</span>
+                            <div className="text-gray-300 font-mono text-[10px] truncate">{log.destination}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">DURUM</span>
+                            <div className={`font-bold ${log.status === 'COMPLETED' ? 'text-emerald-400' : 'text-red-400'}`}>
+                              {log.status === 'COMPLETED' ? '✅ TAMAMLANDI' : log.status === 'PENDING' ? '⏳ BEKLEME' : '❌ RED'}
+                            </div>
                           </div>
                         </div>
                       ))
@@ -1696,57 +1372,70 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Executed Arbitrage Orders Log Ledger */}
+                {/* Order Audit Log (Transaction Records) */}
                 <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
                   <div className="flex items-center justify-between border-b border-gray-900 pb-4 mb-4">
                     <div>
                       <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono">
-                        İŞLEM GEÇMİŞİ VE MİKROSANİYE RAPORU (LEDGER)
+                        BORSADA TAMAMLANAN EMİRLER (ORDER BOOK AUDIT)
                       </h3>
-                      <p className="text-xs text-gray-500">Milisaniyelik borsa emir kayıtları</p>
+                      <p className="text-xs text-gray-500">Her bir alış/satış işleminin tam kaydı ve durum bilgisi</p>
                     </div>
-                    {engineConfig.consecutiveFailures > 0 && (
-                      <span className="text-xs text-red-400 font-mono font-bold animate-pulse">
-                        Sıralı Hata: {engineConfig.consecutiveFailures}/3
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        id="btn-reset-ledger"
+                        onClick={handleResetLedger}
+                        className="text-xs bg-red-950/20 hover:bg-red-900/30 text-red-400 border border-red-500/20 px-3 py-1.5 rounded font-mono font-bold transition duration-150"
+                      >
+                        🔄 DEFTER SIFIRLASİ (FULL RESET)
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="max-h-[250px] overflow-y-auto font-mono text-[11px] leading-relaxed space-y-2">
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
                     {orderLogs.length === 0 ? (
-                      <div className="text-center py-10 text-gray-600 italic">
-                        Motor aktifken saptanan arbitrallere yönelik otomatik milisaniyelik emir tetiklemeleri burada listelenecektir.
+                      <div className="text-center py-6 text-gray-500 text-xs">
+                        Henüz emir kaydı yok. Bot aktif hale getirin veya emir hatası tetikleyin...
                       </div>
                     ) : (
                       orderLogs.map((log) => (
-                        <div key={log.id} className="bg-gray-900/20 border border-gray-900 p-2.5 rounded-lg flex items-start sm:items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                              log.status === 'REJECTED' ? 'bg-red-500/10 text-red-400' :
-                              log.type === 'BUY' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-                            }`}>
-                              {log.status === 'REJECTED' ? 'REJECTED' : log.type}
-                            </span>
-                            <span className="text-gray-300 font-bold">{log.asset}/USDT</span>
-                            <span className="text-gray-500">@ {log.exchange}</span>
+                        <div
+                          key={log.id}
+                          className={`grid grid-cols-1 sm:grid-cols-6 gap-2 p-3 rounded-lg border font-mono text-xs ${
+                            log.status === 'COMPLETED'
+                              ? 'bg-emerald-950/20 border-emerald-500/20'
+                              : log.status === 'REJECTED'
+                              ? 'bg-red-950/20 border-red-500/20'
+                              : 'bg-amber-950/20 border-amber-500/20'
+                          }`}
+                        >
+                          <div>
+                            <span className="text-gray-500 text-[10px]">ZAMANLAMASI</span>
+                            <div className="text-gray-300">{new Date(log.timestamp).toLocaleTimeString()}</div>
                           </div>
-
-                          <div className="flex items-center gap-4 text-right">
-                            <div>
-                              <span className="text-gray-500 block text-[9px]">FİYAT</span>
-                              <span className="text-gray-300 font-bold">${log.price}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 block text-[9px]">MİKTAR</span>
-                              <span className="text-gray-300">{log.quantity}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 block text-[9px]">İŞLEM HIZI</span>
-                              <span className="text-emerald-400 font-bold">{log.latencyUs} μs</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 block text-[9px]">DURUM</span>
-                              <span className={log.status === 'REJECTED' ? 'text-red-500 font-bold' : 'text-emerald-500 font-bold'}>{log.status}</span>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">VARLIQ</span>
+                            <div className="text-white font-bold">{log.asset}/USDT</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">TİP</span>
+                            <div className={log.type === 'BUY' ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>{log.type}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">BORSA</span>
+                            <div className="text-gray-300">{log.exchange}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">FİYAT × MİKTAR</span>
+                            <div className="text-gray-300">${log.price} × {log.quantity}</div>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 text-[10px]">DURUM</span>
+                            <div className={`font-bold ${
+                              log.status === 'COMPLETED' ? 'text-emerald-400' : 
+                              log.status === 'REJECTED' ? 'text-red-400' : 'text-amber-400'
+                            }`}>
+                              {log.status === 'COMPLETED' ? '✅' : log.status === 'REJECTED' ? '❌' : '⏳'} {log.status}
                             </div>
                           </div>
                         </div>
@@ -1754,485 +1443,209 @@ export default function App() {
                     )}
                   </div>
                 </div>
-
               </div>
 
-              {/* RIGHT SIDE: Balances, API parameters, and Environmental setup (4 Columns) */}
+              {/* RIGHT SIDE: CEX Settings Panel (4 Columns) */}
               <div className="lg:col-span-4 space-y-6">
                 
-                {/* Simulated Environmental CEX Balance Sheet */}
-                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 relative overflow-hidden">
-                  <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono border-b border-gray-900 pb-4 mb-4 flex items-center justify-between">
-                    <span>CEX BAKİYE DURUMLARI (BALANCE SHEET)</span>
-                    <button
-                      id="btn-reset-balances"
-                      onClick={handleResetLedger}
-                      className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-3 h-3 animate-spin-hover" /> RESET ALL
-                    </button>
-                  </h3>
+                {/* Portfolio Breakdown */}
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <div className="border-b border-gray-900 pb-4 mb-4">
+                    <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono flex items-center gap-2">
+                      <Wallet className="w-4 h-4 text-emerald-400" />
+                      Portfolio Dağılımı
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">3 borsada dağıtılmış varlıklar</p>
+                  </div>
 
-                  {/* Portfolio breakdown per exchange */}
-                  <div className="space-y-4">
-                    {EXCHANGES.map((exch) => (
-                      <div key={exch.id} className="bg-gray-900/30 border border-gray-900 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-mono font-bold border-b border-gray-800 pb-1.5">
-                          <span className="text-gray-300">{exch.name} Balance</span>
-                          <span className="text-emerald-400">
-                            ${(balances[exch.id]?.USDT || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-gray-400">
-                          <div>BTC: <span className="text-gray-200 font-semibold">{balances[exch.id]?.BTC || 0}</span></div>
-                          <div>ETH: <span className="text-gray-200 font-semibold">{balances[exch.id]?.ETH || 0}</span></div>
-                          <div>SOL: <span className="text-gray-200 font-semibold">{balances[exch.id]?.SOL || 0}</span></div>
-                          <div>AVAX: <span className="text-gray-200 font-semibold">{balances[exch.id]?.AVAX || 0}</span></div>
-                        </div>
+                  <div className="space-y-3 font-mono text-xs">
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">💵 USDT Toplam:</span>
+                      <span className="text-emerald-400 font-bold">${sums.totalUsdt.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">₿ BTC Toplam:</span>
+                      <span className="text-white font-bold">{sums.totalBtc.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">Ξ ETH Toplam:</span>
+                      <span className="text-white font-bold">{sums.totalEth.toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2.5 bg-gray-900/20 rounded border border-gray-900">
+                      <span className="text-gray-400">◎ SOL Toplam:</span>
+                      <span className="text-white font-bold">{sums.totalSol.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-900/40">
+                      <div className="bg-emerald-950/10 border border-emerald-500/20 p-3 rounded-lg font-mono text-xs">
+                        <p className="text-gray-400 text-[10px] uppercase">TOPLAM KONSOLİDE PORTFÖY DEĞERİ (USD)</p>
+                        <p className="text-emerald-400 font-bold text-lg mt-1">${totalPortfolioValueUSD.toFixed(2)}</p>
                       </div>
-                    ))}
-
-                    {/* Total assets aggregate in USD */}
-                    <div className="bg-emerald-950/10 border border-emerald-500/20 p-3 rounded-lg font-mono text-xs">
-                      <p className="text-gray-400 text-[10px] uppercase">TOPLAM KONSOLİDE PORTFÖY DEĞERİ (USD)</p>
-                      <p className="text-lg font-bold text-emerald-400 mt-1">
-                        ${totalPortfolioValueUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                      </p>
-                      <p className="text-[9px] text-gray-500 mt-1">Gerçek borsa cüzdan bakiyelerinizin (USD bazlı) ve spot varlıkların anlık toplanmış konsolide değeridir.</p>
                     </div>
                   </div>
                 </div>
 
-                {/* BOT MODE SELECTOR (HFL-BOT vs. FALE) */}
+                {/* Engine Settings Panel */}
                 <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono border-b border-gray-900 pb-3 mb-3">
-                    BOT OPERASYONEL MODU
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-2 font-mono text-xs mb-3">
-                    <button
-                      id="btn-set-mode-hfl"
-                      onClick={() => setEngineConfig(prev => ({ ...prev, engineMode: 'HFL_BOT' }))}
-                      className={`p-2.5 rounded-lg border text-center transition duration-150 cursor-pointer ${
-                        engineConfig.engineMode === 'HFL_BOT'
-                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
-                          : 'bg-black border-gray-900 text-gray-500 hover:text-gray-300'
-                      }`}
-                    >
-                      HFL-BOT
-                      <span className="block text-[8px] font-normal mt-0.5">Profit-Lock Safe</span>
-                    </button>
-
-                    <button
-                      id="btn-set-mode-fale"
-                      onClick={() => setEngineConfig(prev => ({ ...prev, engineMode: 'FALE' }))}
-                      className={`p-2.5 rounded-lg border text-center transition duration-150 cursor-pointer ${
-                        engineConfig.engineMode === 'FALE'
-                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold'
-                          : 'bg-black border-gray-900 text-gray-500 hover:text-gray-300'
-                      }`}
-                    >
-                      FALE MODE
-                      <span className="block text-[8px] font-normal mt-0.5">Auto-Withdrawal</span>
-                    </button>
-                  </div>
-
-                  <p className="text-[10px] text-gray-500 font-mono leading-relaxed">
-                    {engineConfig.engineMode === 'HFL_BOT' 
-                      ? 'HFL-BOT Modu: Bot kâr limitine ulaştığında otomatik olarak durur ve çekim için manuel onayınızı bekler (Sıfır para çekme kodu güvencesi).'
-                      : 'FALE Modu: Belirlenen kâr eşiğine ulaşıldığında, kazanç otomatik olarak hard-coded Whitelist cüzdan adresinize transfer edilir.'
-                    }
-                  </p>
-                </div>
-
-                {/* Arbitrage Engine Threshold Parameters (Turkish UI) */}
-                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
-                  <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono border-b border-gray-900 pb-4 mb-4">
-                    HASSASİYET PARAMETRELERİ
-                  </h3>
-
-                  <form onSubmit={handleSaveParameters} className="space-y-4 font-mono text-xs">
+                  <form onSubmit={handleSaveParameters} className="space-y-4">
                     <div>
-                      <label className="block text-gray-400 mb-1.5">MİNİMUM ARBİTRAJ TOLERANSI (BUFFER OVER FEES)</label>
-                      <div className="relative">
-                        <input
-                          id="input-min-arbitrage-buffer"
-                          type="text"
-                          value={tempBuffer}
-                          onChange={(e) => setTempBuffer(e.target.value)}
-                          className="w-full bg-black border border-gray-900 p-2.5 rounded text-gray-200 font-mono focus:border-emerald-500/50 outline-none"
-                          placeholder="0.01"
-                        />
-                        <span className="absolute right-3 top-2.5 text-gray-500">%</span>
-                      </div>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono">
+                        Arbitraj Minimum Tampon (%):
+                      </label>
+                      <input
+                        type="text"
+                        value={tempBuffer}
+                        onChange={(e) => setTempBuffer(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">Minimum net spread kabul edilebilir miktar</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono">
+                        Sipariş Büyüklüğü (USD):
+                      </label>
+                      <input
+                        type="text"
+                        value={tempTradeSize}
+                        onChange={(e) => setTempTradeSize(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">Her bir arbitraj döngüsünde kullanılan USDT</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono">
+                        {engineConfig.engineMode === 'HFL_BOT' ? 'Kar Kilidi Eşiği ($):' : 'Oto Çekim Eşiği ($):'}
+                      </label>
+                      <input
+                        type="text"
+                        value={engineConfig.engineMode === 'HFL_BOT' ? tempProfitLock : tempAutoWithdraw}
+                        onChange={(e) => engineConfig.engineMode === 'HFL_BOT' ? setTempProfitLock(e.target.value) : setTempAutoWithdraw(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                      />
                       <p className="text-[10px] text-gray-500 mt-1">
-                        Net kâr, komisyon oranını bu oranda geçince alım/satım tetiklenir (Varsayılan %0.01).
+                        {engineConfig.engineMode === 'HFL_BOT' 
+                          ? 'Botun işlemi durdurduğu kâr seviyesi'
+                          : 'Otomatik Whitelist çekiminin tetiklenme seviyesi'}
                       </p>
                     </div>
-
-                    <div>
-                      <label className="block text-gray-400 mb-1.5">TEK SEFERLİK İŞLEM BÜYÜKLÜĞÜ</label>
-                      <div className="relative">
-                        <input
-                          id="input-trade-size-usd"
-                          type="text"
-                          value={tempTradeSize}
-                          onChange={(e) => setTempTradeSize(e.target.value)}
-                          className="w-full bg-black border border-gray-900 p-2.5 rounded text-gray-200 font-mono focus:border-emerald-500/50 outline-none"
-                          placeholder="5000"
-                        />
-                        <span className="absolute right-3 top-2.5 text-gray-500">USDT</span>
-                      </div>
-                    </div>
-
-                    {engineConfig.engineMode === 'HFL_BOT' ? (
-                      <div>
-                        <label className="block text-gray-400 mb-1.5">KÂR KİLİDİ EŞİĞİ (PROFIT-LOCK LIMIT)</label>
-                        <div className="relative">
-                          <input
-                            id="input-profit-lock-threshold"
-                            type="text"
-                            value={tempProfitLock}
-                            onChange={(e) => setTempProfitLock(e.target.value)}
-                            className="w-full bg-black border border-gray-900 p-2.5 rounded text-gray-200 font-mono focus:border-emerald-500/50 outline-none"
-                            placeholder="10.00"
-                          />
-                          <span className="absolute right-3 top-2.5 text-gray-500">USDT</span>
-                        </div>
-                        <p className="text-[10px] text-amber-500 mt-1">
-                          Kâr bu limit değerine ulaştığında bot güvenli şekilde durdurulur (Profit Lock).
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-gray-400 mb-1.5">OTONOM ÇEKİM EŞİĞİ (WITHDRAW THRESHOLD)</label>
-                        <div className="relative">
-                          <input
-                            id="input-auto-withdraw-threshold"
-                            type="text"
-                            value={tempAutoWithdraw}
-                            onChange={(e) => setTempAutoWithdraw(e.target.value)}
-                            className="w-full bg-black border border-gray-900 p-2.5 rounded text-gray-200 font-mono focus:border-emerald-500/50 outline-none"
-                            placeholder="5.00"
-                          />
-                          <span className="absolute right-3 top-2.5 text-gray-500">USDT</span>
-                        </div>
-                        <p className="text-[10px] text-emerald-400 mt-1">
-                          Biriken kâr bu değere ulaştığında Whitelist adrese otomatik transfer emri tetiklenir.
-                        </p>
-                      </div>
-                    )}
 
                     <button
-                      id="btn-save-engine-config"
                       type="submit"
-                      className="w-full bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 py-2.5 rounded font-bold font-mono transition duration-200 cursor-pointer"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
                     >
-                      PARAMETRELERİ BELLEĞE KAYDET
+                      ✓ PARAMETRELERI KAYDET
                     </button>
-
-                    {settingsSavedMessage && (
-                      <p className="text-[10px] text-emerald-400 text-center animate-pulse">{settingsSavedMessage}</p>
-                    )}
                   </form>
-                </div>
 
-                {/* Whitelisted Wallet Address Card (Interactive Secure Whitelist Management Panel) */}
-                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 font-mono text-xs">
-                  <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider border-b border-gray-900 pb-3 mb-3 flex items-center gap-2">
-                    <Wallet className="w-4 h-4 text-emerald-400" />
-                    BEYAZ LİSTE CÜZDAN YÖNETİM PANELİ
-                  </h3>
-                  
-                  {/* Status Indicator */}
-                  {!engineConfig.whitelistedWallet ? (
-                    <div className="bg-red-950/20 border border-red-500/30 p-3 rounded-lg mb-4 space-y-1">
-                      <div className="flex justify-between items-center text-[10px] text-red-400">
-                        <span className="font-bold flex items-center gap-1">⚠️ GÜVENLİK BLOKAJI: AKTİF</span>
-                        <span className="text-red-500 font-bold uppercase tracking-widest text-[8px] bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">
-                          CÜZDAN TANIMLANMAMIŞ
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-red-200/80 leading-relaxed">
-                        Bot kâr transferi yapamaz! Güvenlik gereği, bakiye otonom çekim ve bot başlatma sistemleri tamamen kilitli (Blocked) durumdadır.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-emerald-950/20 border border-emerald-500/30 p-3 rounded-lg mb-4 space-y-1">
-                      <div className="flex justify-between items-center text-[10px] text-emerald-400">
-                        <span className="font-bold flex items-center gap-1">✅ BEYAZ LİSTE AKTİF</span>
-                        <span className="text-emerald-500 font-bold uppercase tracking-widest text-[8px] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                          ŞİFRELİ LOKAL HAFIZA
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-gray-300 break-all select-all font-semibold p-1 bg-black/40 rounded border border-gray-900">
-                        {engineConfig.whitelistedWallet}
-                      </p>
-                      <p className="text-[9px] text-gray-500 leading-relaxed pt-1">
-                        Otonom (FALE) ve manuel tüm çekimler strictly bu adrese yönlendirilir. Kod içinde harici veya gizli başka hiçbir adres bulunmamaktadır.
-                      </p>
+                  {settingsSavedMessage && (
+                    <div className="mt-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2 rounded text-center">
+                      {settingsSavedMessage}
                     </div>
                   )}
+                </div>
 
-                  <form onSubmit={handleSaveWallet} className="space-y-3">
+                {/* Whitelisted Wallet Manager */}
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <form onSubmit={handleSaveWallet} className="space-y-4">
                     <div>
-                      <label className="block text-gray-400 mb-1.5 uppercase">Kişisel Cüzdan Adresiniz (USDT/ERC20/TRC20)</label>
+                      <label className="block text-xs font-bold text-gray-300 mb-2 uppercase font-mono flex items-center gap-2">
+                        <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                        Beyaz Liste Cüzdan Adresi:
+                      </label>
                       <input
                         id="input-whitelisted-wallet"
                         type="text"
                         value={tempWallet}
                         onChange={(e) => setTempWallet(e.target.value)}
-                        className="w-full bg-black border border-gray-900 p-2.5 rounded text-gray-200 font-mono focus:border-emerald-500/50 outline-none text-[11px]"
-                        placeholder="0x... veya T... cüzdan adresinizi buraya girin"
+                        placeholder="0x..."
+                        className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                       />
+                      <p className="text-[10px] text-gray-500 mt-1">Otonom çekimlerin gideceği güvenli adres</p>
                     </div>
 
                     <button
-                      id="btn-save-wallet-address"
                       type="submit"
-                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-black py-2 rounded font-bold font-mono transition duration-200 cursor-pointer text-xs"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
                     >
-                      CÜZDANI GÜVENLİ PANELDE ETKİNLEŞTİR
+                      ✓ CÜZDAN ADRESINI KAYDET
                     </button>
-
-                    {walletSavedMessage && (
-                      <p className="text-[10px] text-emerald-400 text-center animate-pulse">{walletSavedMessage}</p>
-                    )}
                   </form>
 
-                  <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">
-                    Sistem hiçbir cüzdan özel anahtarını istemez veya sunuculara göndermez. Cüzdan adresi strictly tarayıcınızın lokal şifreli konfigürasyonunda saklanır.
-                  </p>
+                  {walletSavedMessage && (
+                    <div className="mt-3 text-xs bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-2 rounded text-center">
+                      {walletSavedMessage}
+                    </div>
+                  )}
                 </div>
 
-                {/* Personal Exchange Referral & Rebate Management Panel */}
-                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 space-y-4 font-mono text-xs">
-                  <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider border-b border-gray-900 pb-3 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-400" />
-                    KİŞİSEL BORSA REFERANS & REBATE PANELİ
-                  </h3>
-
-                  <p className="text-[10px] text-gray-400 leading-relaxed">
-                    Kendi borsa hesaplarınızdan oluşturduğunuz <strong>referans (referral)</strong> kodlarınızı buraya giriniz. 
-                    Botun yapacağı hacim üzerinden borsanın geri ödeyeceği tüm komisyon iadeleri (Maker/Taker Rebates) 
-                    <strong>doğrudan sizin kendi borsa hesabınıza ve cüzdanınıza aktarılır</strong>. Üçüncü şahıslara komisyon ödemezsiniz.
-                  </p>
-
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    setReferralIds({
-                      binance: tempReferralIds.binance.trim(),
-                      okx: tempReferralIds.okx.trim(),
-                      coinbase: tempReferralIds.coinbase.trim()
-                    });
-                    alert('Referans kodları güvenli lokal belleğe kaydedildi! Komisyon iadeleri bu kodlar üzerinden hesaplanacaktır.');
-                  }} className="space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <div>
-                        <label className="block text-gray-500 text-[9px] uppercase mb-1">BINANCE REFERRAL ID:</label>
-                        <input
-                          id="input-referral-binance"
-                          type="text"
-                          value={tempReferralIds.binance}
-                          onChange={(e) => setTempReferralIds(prev => ({ ...prev, binance: e.target.value }))}
-                          className="w-full bg-black border border-gray-900 p-2 rounded text-gray-200 text-[11px] focus:border-emerald-500/40 outline-none"
-                          placeholder="Örn: REF_B_82941"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-500 text-[9px] uppercase mb-1">OKX REFERRAL ID:</label>
-                        <input
-                          id="input-referral-okx"
-                          type="text"
-                          value={tempReferralIds.okx}
-                          onChange={(e) => setTempReferralIds(prev => ({ ...prev, okx: e.target.value }))}
-                          className="w-full bg-black border border-gray-900 p-2 rounded text-gray-200 text-[11px] focus:border-emerald-500/40 outline-none"
-                          placeholder="Örn: REF_O_10394"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-500 text-[9px] uppercase mb-1">COINBASE ID:</label>
-                        <input
-                          id="input-referral-coinbase"
-                          type="text"
-                          value={tempReferralIds.coinbase}
-                          onChange={(e) => setTempReferralIds(prev => ({ ...prev, coinbase: e.target.value }))}
-                          className="w-full bg-black border border-gray-900 p-2 rounded text-gray-200 text-[11px] focus:border-emerald-500/40 outline-none"
-                          placeholder="Örn: REF_C_22019"
-                        />
-                      </div>
-                    </div>
-
+                {/* Exchange API Key Manager */}
+                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider font-mono">
+                      Borsa API Anahtar Yönetimi
+                    </h4>
                     <button
-                      id="btn-save-referrals"
-                      type="submit"
-                      className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 py-2 rounded font-bold font-mono transition duration-200 cursor-pointer text-xs uppercase"
+                      onClick={() => setApiKeysVisible(!apiKeysVisible)}
+                      className={`text-xs font-mono font-bold px-2 py-1 rounded transition ${
+                        apiKeysVisible
+                          ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                          : 'bg-gray-900 text-gray-400 border border-gray-800'
+                      }`}
                     >
-                      KODLARI GÜVENLİ HAFIZADA AKTİFLEŞTİR
+                      {apiKeysVisible ? '🔒 GİZLE' : '🔑 GÖSTER'}
                     </button>
-                  </form>
-                </div>
-
-                {/* Secure Environmental API Key Cryptography Store */}
-                <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-900 pb-4 gap-2">
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                        <Cpu className="w-4 h-4 text-emerald-400" />
-                        ŞİFRELİ CEX ANAHTAR HAFIZASI
-                      </h3>
-                      <p className="text-[10px] text-gray-500 mt-0.5">API keys strictly run inside client sandbox memory</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        id="btn-load-open-source-test-keys"
-                        onClick={loadOpenSourceTestKeys}
-                        className="bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/35 text-[10px] font-mono px-2.5 py-1 rounded transition cursor-pointer font-bold uppercase"
-                      >
-                        ⚡ AÇIK KAYNAK TESTNET KEY YÜKLE
-                      </button>
-                      <button
-                        type="button"
-                        id="btn-toggle-api-keys"
-                        onClick={() => setApiKeysVisible(!apiKeysVisible)}
-                        className="text-[10px] bg-gray-900 hover:bg-gray-800 text-gray-400 border border-gray-800 px-2 py-1 rounded font-mono"
-                      >
-                        {apiKeysVisible ? 'GİZLE' : 'GÖSTER'}
-                      </button>
-                    </div>
                   </div>
 
-                  <p className="text-[10px] text-gray-400 font-mono leading-relaxed">
-                    Borsa bağlantılarınız için <strong>açık kaynak CCXT sürücüleri</strong> kullanılmaktadır. Anahtarlar tarayıcı local RAM belleğinde şifrelenir ve asla harici sunuculara veya izleme servislerine gönderilmez.
-                  </p>
-
-                  {/* API Authorization Level Selector */}
-                  <div className="bg-black/50 border border-gray-900 rounded-lg p-3 space-y-2">
-                    <span className="text-[9px] text-gray-400 uppercase font-bold block font-mono">İŞLEM YETKİSİ SEVİYESİ (API PERMISSION LEVEL)</span>
-                    <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
-                      <button
-                        type="button"
-                        id="btn-permission-read-only"
-                        onClick={() => {
-                          setApiPermissionLevel('read_only');
-                          alert('🛡️ Güvenli Sadece Okuma Modu Seçildi! Sistem borsa hesabınızda kesinlikle gerçek alım/satım yapmaz (Yazma yetkisi gerekmez). Sadece hacim ve rebate takibi yapar.');
-                        }}
-                        className={`p-2 rounded border text-center transition ${
-                          apiPermissionLevel === 'read_only'
-                            ? 'bg-emerald-500/15 border-emerald-500 text-emerald-400 font-bold'
-                            : 'bg-transparent border-gray-900 text-gray-500 hover:text-gray-300'
-                        }`}
-                      >
-                        🛡️ Sadece Okuma (Read-Only)
-                        <span className="block text-[8px] text-gray-500 font-normal mt-0.5">Yazma Yetkisi Gerekmez</span>
-                      </button>
-                      <button
-                        type="button"
-                        id="btn-permission-live-trade"
-                        onClick={() => {
-                          setApiPermissionLevel('live_trade');
-                          alert('⚠️ Aktif Alım-Satım Modu Seçildi! Girdiğiniz API anahtarlarının spot işlem (Trade) yetkisi açık olmalıdır. Cüzdan güvenliğiniz için para çekme (Withdraw) yetkisini KAPALI tuttuğunuzdan emin olun.');
-                        }}
-                        className={`p-2 rounded border text-center transition ${
-                          apiPermissionLevel === 'live_trade'
-                            ? 'bg-amber-500/15 border-amber-500 text-amber-400 font-bold'
-                            : 'bg-transparent border-gray-900 text-gray-500 hover:text-gray-300'
-                        }`}
-                      >
-                        ⚡ Canlı Arbitraj (Read & Write)
-                        <span className="block text-[8px] text-gray-500 font-normal mt-0.5">Gerçek Alım/Satım</span>
-                      </button>
-                    </div>
-                    <p className="text-[9px] text-gray-500 leading-relaxed pt-1">
-                      {apiPermissionLevel === 'read_only' 
-                        ? '🛡️ Güvenli Mod Aktif: API anahtarı girseniz bile sistem işlem yapmaz. Sadece canlı piyasa hacmini takip eder ve cüzdanınızdaki rebate birikimlerini hesaplar.' 
-                        : '⚠️ Canlı İşlem Aktif: Girdiğiniz API anahtarının Alım-Satım (Spot Trading) yetkisinin açık olması gerekir. Para Çekme (Withdrawal) yetkisi kesinlikle KAPALI tutulmalıdır.'
-                      }
-                    </p>
-                  </div>
-
-                  <div className="space-y-4 font-mono text-xs">
-                    {EXCHANGES.map((exch) => {
-                      const keys = engineConfig.apiKeys[exch.id];
-                      return (
-                        <div key={exch.id} className="space-y-2 bg-black/40 border border-gray-900 p-3 rounded-lg">
-                          <div className="flex justify-between items-center text-[10px] text-gray-300 font-bold">
-                            <span className="uppercase text-emerald-400">{exch.name} API CONFIG</span>
-                            <span className="text-emerald-500 flex items-center gap-1 text-[9px] uppercase">
-                              <Check className="w-3 h-3" /> %100 Açık Kaynak API
-                            </span>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div>
-                              <label className="block text-[10px] text-gray-500 uppercase mb-1">API Key:</label>
-                              <input
-                                type={apiKeysVisible ? "text" : "password"}
-                                value={keys.apiKey}
-                                onChange={(e) => handleUpdateApiKey(exch.id, 'apiKey', e.target.value)}
-                                className="w-full bg-black border border-gray-900 p-2 rounded text-gray-300 text-[11px] focus:border-emerald-500/40 outline-none"
-                                placeholder={`${exch.name} API Key`}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] text-gray-500 uppercase mb-1">Secret Key:</label>
-                              <input
-                                type={apiKeysVisible ? "text" : "password"}
-                                value={keys.apiSecret}
-                                onChange={(e) => handleUpdateApiKey(exch.id, 'apiSecret', e.target.value)}
-                                className="w-full bg-black border border-gray-900 p-2 rounded text-gray-300 text-[11px] focus:border-emerald-500/40 outline-none"
-                                placeholder={`${exch.name} Secret Key`}
-                              />
-                            </div>
-                          </div>
+                  {apiKeysVisible && (
+                    <div className="space-y-4">
+                      {Object.entries(engineConfig.apiKeys).map(([exchangeId, keys]) => (
+                        <div key={exchangeId} className="space-y-2 bg-gray-900/20 p-3 rounded border border-gray-900">
+                          <h5 className="text-xs font-bold text-gray-300 uppercase font-mono">{exchangeId.toUpperCase()}</h5>
+                          <input
+                            type="password"
+                            placeholder="API Key"
+                            value={keys.apiKey}
+                            onChange={(e) => handleUpdateApiKey(exchangeId, 'apiKey', e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                          />
+                          <input
+                            type="password"
+                            placeholder="API Secret"
+                            value={keys.apiSecret}
+                            onChange={(e) => handleUpdateApiKey(exchangeId, 'apiSecret', e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                          />
+                          {keys.passphrase !== undefined && (
+                            <input
+                              type="password"
+                              placeholder="Passphrase (if applicable)"
+                              value={keys.passphrase || ''}
+                              onChange={(e) => handleUpdateApiKey(exchangeId, 'passphrase', e.target.value)}
+                              className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          )}
                         </div>
-                      );
-                    })}
-                  </div>
+                      ))}
+
+                      <button
+                        onClick={loadOpenSourceTestKeys}
+                        className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-bold py-2 rounded transition duration-150 uppercase font-mono"
+                      >
+                        📚 AÇIK KAYNAK TEST ANAHTAR YÜKLE
+                      </button>
+
+                      <p className="text-[10px] text-gray-500">
+                        ⚠️ Anahtarlar sadece tarayıcı RAM belleğinde (localStorage) saklı kalır. Sunucu tarafına gönderilmez.
+                      </p>
+                    </div>
+                  )}
                 </div>
-
               </div>
-
             </div>
-
           </div>
         )}
-
       </main>
-
-      {/* Footer Design */}
-      <footer className="border-t border-gray-900 bg-gray-950/60 py-6 px-4 mt-12 font-mono text-xs text-center text-gray-500">
-        <div className="max-w-7xl mx-auto space-y-2">
-          <p>ZERO-TRUST ARBITRAGE ENGINE &bull; 100% NATIVE COMPILATION GUARANTEE</p>
-          <p className="text-[10px] text-gray-600">
-            Absolutely no analytics script or monitoring services are initialized. Source signature: {generateLocalHash('complete-react-application-production-final-v2')}
-          </p>
-        </div>
-      </footer>
-
     </div>
-  );
-}
-
-// Inline fallback SVG component
-function ShieldCheckIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
   );
 }
