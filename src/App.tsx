@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Shield, Play, Pause, RefreshCw, Layers, TrendingUp, AlertTriangle,
   ArrowRight, DollarSign, Cpu, CheckCircle2, FileCode, Wifi, Clock,
