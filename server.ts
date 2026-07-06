@@ -6,7 +6,15 @@ import ccxt from 'ccxt';
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+// Set charset for all HTML responses
+app.use((req, res, next) => {
+  if (!res.getHeader('Content-Type')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  }
+  next();
+});
+
+const PORT = process.env.PORT || 3000;
 
 // Supported asset symbols
 type AssetSymbol = 'BTC' | 'ETH' | 'SOL' | 'AVAX' | 'LINK';
