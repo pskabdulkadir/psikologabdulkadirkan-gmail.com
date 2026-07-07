@@ -3,7 +3,7 @@ import {
   Shield, Play, Pause, RefreshCw, Layers, TrendingUp, AlertTriangle,
   ArrowRight, DollarSign, Cpu, CheckCircle2, FileCode, Wifi, Clock,
   Lock, Settings, ShieldAlert, KeyRound, Check, Wallet, Send, LogOut, Info, AlertOctagon,
-  FileDown
+  FileDown, Zap
 } from 'lucide-react';
 import {
   AssetSymbol, EngineMode, ExchangeConfig, ExchangeMarketData, ArbitrageOpportunity,
@@ -1142,17 +1142,11 @@ export default function App() {
 
           {/* Engine Power Switch & Quick Stats */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* System Mode Status */}
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-mono ${
-              engineConfig.systemEnvironment === 'SECURE_REBATE'
-                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400'
-                : 'bg-amber-950/40 border-amber-500/40 text-amber-400'
-            }`}>
-              <span className="opacity-70">SİSTEM:</span>
-              <span className="font-bold">{engineConfig.systemEnvironment === 'SECURE_REBATE' ? 'MAKER-REBATE' : 'SİM MODE'}</span>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{
-                backgroundColor: engineConfig.systemEnvironment === 'SECURE_REBATE' ? '#4ade80' : '#fbbf24'
-              }} />
+            {/* HFT System Mode Status */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-mono bg-emerald-950/40 border-emerald-500/40 text-emerald-400">
+              <span className="opacity-70">HFT:</span>
+              <span className="font-bold">MAKER-ONLY</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </div>
 
             {/* Quick Status */}
@@ -1283,64 +1277,33 @@ export default function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Kart 1: Demo / Simulation */}
-            <div
-              onClick={() => {
-                setEngineConfig(prev => ({ ...prev, systemEnvironment: 'SIMULATION_DEMO' }));
-              }}
-              className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                engineConfig.systemEnvironment === 'SIMULATION_DEMO'
-                  ? 'bg-amber-950/20 border-amber-500/40 shadow-lg shadow-amber-500/5'
-                  : 'bg-black/40 border-gray-900 hover:border-gray-800'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-amber-200 font-mono">1. SİMÜLASYON (TEST MODU)</h4>
-                  <input
-                    type="radio"
-                    checked={engineConfig.systemEnvironment === 'SIMULATION_DEMO'}
-                    onChange={() => {}}
-                    className="accent-amber-500"
-                  />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Maker-Only emirlerini simüle eder. Gerçek işlem gönderimi olmadan rebate kazanım testi yapabilirsiniz. API key olmadan çalışır.
-                </p>
+          <div className="bg-gradient-to-r from-emerald-950/40 to-green-950/40 border border-emerald-500/40 rounded-xl p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                <Zap className="w-6 h-6" />
               </div>
-              <div className="text-[10px] text-amber-500/80 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Sanal Emirler &bull; Sıfır Risk &bull; API Gerekli Değil
+              <div>
+                <h4 className="text-sm font-bold text-emerald-100 uppercase tracking-wider">HFT Maker-Only Rebate Farming</h4>
+                <p className="text-[11px] text-emerald-300/70 mt-0.5">Yüksek Frekanslı Likidite Sağlama & Rebate Kazanç Motoru</p>
               </div>
             </div>
 
-            {/* Kart 2: Maker-Only Rebate Farming */}
-            <div
-              onClick={() => {
-                setEngineConfig(prev => ({ ...prev, systemEnvironment: 'SECURE_REBATE' }));
-              }}
-              className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                engineConfig.systemEnvironment === 'SECURE_REBATE'
-                  ? 'bg-emerald-950/20 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                  : 'bg-black/40 border-gray-900 hover:border-gray-800'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-emerald-400 font-mono">2. MAKER-ONLY REBATE FARMING</h4>
-                  <input
-                    type="radio"
-                    checked={engineConfig.systemEnvironment === 'SECURE_REBATE'}
-                    onChange={() => {}}
-                    className="accent-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Post-Only limit emirler göndererek borsa rebate'i kazanır. API Key ile gerçek işlem yapar (Withdrawal hard-locked). fetchBalance ile otomatik bakiye kontrol.
-                </p>
+            <p className="text-[10px] text-gray-400 leading-relaxed bg-black/30 p-3 rounded-lg mb-4">
+              Sistem, gerçek cüzdan bakiyenizle Post-Only Maker emirleri göndererek piyasaya likidite sağlar. Borsa tarafından verilen işlem ücreti iadeleri (Rebate) otomatik olarak hesaplanır ve biriktirilerek dashboard'da gösterilir. Withdrawal yetkisi backend seviyesinde hard-locked'tır.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[10px] font-mono">
+              <div className="bg-black/40 border border-emerald-500/20 rounded-lg p-2.5">
+                <span className="text-gray-500 block mb-1">📊 İŞLEM TIPI</span>
+                <span className="text-emerald-400 font-bold">Post-Only (Maker)</span>
               </div>
-              <div className="text-[10px] text-emerald-500/80 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Gerçek İşlem &bull; Rebate Kazanç &bull; Maker-Only
+              <div className="bg-black/40 border border-emerald-500/20 rounded-lg p-2.5">
+                <span className="text-gray-500 block mb-1">🔐 PARA ÇEKME</span>
+                <span className="text-red-400 font-bold">HARD-LOCKED</span>
+              </div>
+              <div className="bg-black/40 border border-emerald-500/20 rounded-lg p-2.5">
+                <span className="text-gray-500 block mb-1">⚡ DURUM</span>
+                <span className="text-emerald-400 font-bold">HFT AKTİF</span>
               </div>
             </div>
           </div>
