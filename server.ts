@@ -126,48 +126,59 @@ app.get('/api/stats', (req, res) => {
 
 // Export HFT Maker-Only Rebate Report as CSV
 app.get('/api/rebate-report/csv', (req, res) => {
-  const hasLiveKeys = Object.values(store.keys).some(k => k.apiKey && k.apiSecret);
-  const headers = ["İŞLEM TARİHİ", "MAKER HACİMİ (USDT)", "REBATE ORANI", "GERÇEK REBATE (USDT)", "İŞLEM SAYISI", "DURUM"];
-  const csvRows = [headers.join(",")];
+  try {
+    const hasLiveKeys = Object.values(store.keys).some(k => k.apiKey && k.apiSecret);
+    const headers = ["ISLEM_TARIHI", "MAKER_HACIMI_USDT", "REBATE_ORANI", "REBATE_USDT", "ISLEM_SAYISI", "DURUM"];
+    const csvRows: string[] = [];
 
-  const today = new Date().toISOString().split('T')[0];
+    // Add headers
+    csvRows.push(headers.map(h => `"${h}"`).join(","));
 
-  // Gerçek işlem verisi
-  const reportSource = hasLiveKeys ? "HFT_LIVE_EXCHANGE" : "HFT_SIMULATION";
-  const makerOrdersToday = store.orderLogs.filter(o => o.status === 'COMPLETED').length;
+    const today = new Date().toISOString().split('T')[0];
 
-  csvRows.push([
-    today,
-    store.totalVolumeUSD.toFixed(2),
-    "0.05%",
-    store.totalRebateUSD.toFixed(4),
-    makerOrdersToday.toString(),
-    reportSource
-  ].map((val: string) => `"${val.replace(/"/g, '""')}"`).join(","));
+    // Report source
+    const reportSource = hasLiveKeys ? "HFT_LIVE_EXCHANGE" : "HFT_SIMULATION";
+    const makerOrdersToday = store.orderLogs.filter(o => o.status === 'COMPLETED').length;
 
-  // Add historical days
-  for (let i = 1; i <= 6; i++) {
-    const pastDate = new Date();
-    pastDate.setDate(pastDate.getDate() - i);
-    const dateStr = pastDate.toISOString().split('T')[0];
-
-    const dayVolume = (Math.random() * 100000 + 25000).toFixed(2);
-    const dayRebate = (parseFloat(dayVolume) * 0.0005).toFixed(4);
-    const dayOrders = Math.floor(Math.random() * 500 + 50);
-
-    csvRows.push([
-      dateStr,
-      dayVolume,
+    // Today's row
+    const todayRow = [
+      today,
+      store.totalVolumeUSD.toFixed(2),
       "0.05%",
-      dayRebate,
-      dayOrders.toString(),
+      store.totalRebateUSD.toFixed(4),
+      makerOrdersToday.toString(),
       reportSource
-    ].map((val: string) => `"${val.replace(/"/g, '""')}"`).join(","));
-  }
+    ];
+    csvRows.push(todayRow.map(val => `"${val}"`).join(","));
 
-  res.setHeader('Content-Type', 'text/csv;charset=utf-8;');
-  res.setHeader('Content-Disposition', `attachment;filename=HFT_Maker_Rebate_Report_${today}.csv`);
-  res.send(csvRows.join("\n"));
+    // Historical rows
+    for (let i = 1; i <= 6; i++) {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - i);
+      const dateStr = pastDate.toISOString().split('T')[0];
+
+      const dayVolume = (Math.random() * 100000 + 25000).toFixed(2);
+      const dayRebate = (parseFloat(dayVolume) * 0.0005).toFixed(4);
+      const dayOrders = Math.floor(Math.random() * 500 + 50);
+
+      const histRow = [
+        dateStr,
+        dayVolume,
+        "0.05%",
+        dayRebate,
+        dayOrders.toString(),
+        reportSource
+      ];
+      csvRows.push(histRow.map(val => `"${val}"`).join(","));
+    }
+
+    res.setHeader('Content-Type', 'text/csv;charset=utf-8;');
+    res.setHeader('Content-Disposition', `attachment;filename=HFT_Maker_Rebate_Report_${today}.csv`);
+    res.send(csvRows.join("\n"));
+  } catch (error: any) {
+    console.error('CSV export error:', error);
+    res.status(500).json({ error: error.message, type: 'CSV_EXPORT_ERROR' });
+  }
 });
 
 // GET HFT Maker-Only rebate metrics

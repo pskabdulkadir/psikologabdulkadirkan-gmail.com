@@ -173,11 +173,9 @@ export default function App() {
           const metricsData = await resMetrics.json();
           setRebateMetrics(metricsData);
 
-          // Log LIVE_MODE status
-          if (metricsData.liveMode === 'ACTIVE') {
-            console.log(`✅ LIVE_MODE: ACTIVE | Bağlantı Kaynağı: ${metricsData.liveSource} | Hacim: $${metricsData.totalVolumeUSD.toFixed(2)} | Rebate: $${metricsData.totalRebateUSD.toFixed(4)}`);
-          } else {
-            console.log(`⚙️  VAULT_MEM Mode | Yapılandırma bekleniyor...`);
+          // Log HFT status
+          if (metricsData.hasLiveKeys) {
+            console.log(`✅ HFT MAKER-ONLY ACTIVE | Exchange: ${metricsData.activeExchange} | Volume: $${metricsData.totalVolumeUSD.toFixed(2)} | Rebate: $${metricsData.totalRebateUSD.toFixed(4)} | Orders: ${metricsData.makerOrdersCount}`);
           }
         }
       } catch (e) {
