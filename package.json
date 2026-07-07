@@ -1,8 +1,27 @@
 {
-  "name": "react-example",
-  "private": true,
-  "version": "0.0.0",
+  "name": "rebate-farming-engine",
+  "description": "Open Source Self-Hosted Maker-Only Rebate Farming Engine",
+  "version": "1.0.0",
   "type": "module",
+  "private": false,
+  "license": "MIT",
+  "author": "Open Source Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/rebate-farming-engine"
+  },
+  "keywords": [
+    "rebate",
+    "farming",
+    "maker",
+    "trading",
+    "bot",
+    "ccxt",
+    "binance",
+    "okx",
+    "open-source",
+    "self-hosted"
+  ],
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",

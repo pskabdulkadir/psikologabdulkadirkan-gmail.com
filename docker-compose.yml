@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  rebate-engine:
+    build: .
+    container_name: rebate-farming-engine
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    volumes:
+      # Optional: persistent storage for logs
+      - ./logs:/app/logs
+    networks:
+      - rebate-network
+
+networks:
+  rebate-network:
+    driver: bridge
+
+# Usage:
+# docker-compose up -d          (start)
+# docker-compose logs -f        (view logs)
+# docker-compose down           (stop)

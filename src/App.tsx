@@ -1110,10 +1110,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-black text-gray-100 flex flex-col selection:bg-emerald-500 selection:text-black">
       
-      {/* Upper Security Barrier Banner */}
-      <div className="bg-gradient-to-r from-emerald-950/80 via-black to-emerald-950/80 border-b border-emerald-900/40 px-4 py-2 text-center text-[11px] font-mono tracking-wider text-emerald-400 flex items-center justify-center gap-2 flex-wrap">
-        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-        <span>ZERO-TRUST NATIVE BOT ENGINE &bull; PROD ARCHITECTURE &bull; NO NPM MODULE WRAPPERS INSTALLED</span>
+      {/* Open Source Self-Hosted Banner */}
+      <div className="bg-gradient-to-r from-blue-950/80 via-black to-blue-950/80 border-b border-blue-900/40 px-4 py-2 text-center text-[11px] font-mono tracking-wider text-blue-400 flex items-center justify-center gap-2 flex-wrap">
+        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+        <span>🔓 OPEN SOURCE SELF-HOSTED &bull; MIT LICENSE &bull; YOUR API KEYS &bull; YOUR REBATE</span>
       </div>
 
       {/* Main Header */}
