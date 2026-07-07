@@ -1140,11 +1140,17 @@ export default function App() {
 
           {/* Engine Power Switch & Quick Stats */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* HFT System Mode Status */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-mono bg-emerald-950/40 border-emerald-500/40 text-emerald-400">
-              <span className="opacity-70">HFT:</span>
-              <span className="font-bold">MAKER-ONLY</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            {/* Live Connection Status */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-mono ${
+              rebateMetrics?.connectionIndicator?.includes('AKTİF')
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400'
+                : 'bg-gray-950/40 border-gray-700/40 text-gray-400'
+            }`}>
+              <span className="opacity-70">CANLI:</span>
+              <span className="font-bold">{rebateMetrics?.connectionIndicator?.includes('AKTİF') ? 'BORSA BAĞLI' : 'BAĞLANMAMIS'}</span>
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                rebateMetrics?.connectionIndicator?.includes('AKTİF') ? 'bg-emerald-400' : 'bg-gray-400'
+              }`} />
             </div>
 
             {/* Quick Status */}
@@ -2261,6 +2267,28 @@ export default function App() {
                   <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">
                     Sistem hiçbir cüzdan özel anahtarını istemez veya sunuculara göndermez. Cüzdan adresi strictly tarayıcınızın lokal şifreli konfigürasyonunda saklanır.
                   </p>
+
+                  {/* Manual Withdrawal Button */}
+                  {engineConfig.whitelistedWallet && (
+                    <div className="mt-4 pt-4 border-t border-gray-900">
+                      <button
+                        onClick={() => {
+                          const confirmWithdraw = window.confirm(
+                            `Borsa hesabındaki birikmiş rebate'i ${engineConfig.whitelistedWallet} adresine çekmek istediğinizi onaylıyor musunuz?\n\nBu işlem, borsa panelinde 2FA onayı gerektirebilir.`
+                          );
+                          if (confirmWithdraw) {
+                            alert('Manuel çekim başlatma endpoint\'ini çalıştırmak için API paneline yönlendiriliyorsunuz.\n\nBorsa panelinde: Settings → API Management → Withdraw whitelist → Onayla');
+                          }
+                        }}
+                        className="w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 py-2 rounded font-bold font-mono transition duration-200 cursor-pointer text-xs"
+                      >
+                        🔓 MANUEL ÇEKIM (USER APPROVAL)
+                      </button>
+                      <p className="text-[9px] text-amber-400/60 mt-2 leading-relaxed">
+                        Otonom çekim yoktur. Tüm çekimler manuel olarak, kullanıcı onayı ile gerçekleşir.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Personal Exchange Referral & Rebate Management Panel */}

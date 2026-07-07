@@ -24,20 +24,14 @@ interface CacheStore {
 }
 
 const store: CacheStore = {
-  prices: {
-    BTC: 89450.00,
-    ETH: 3420.50,
-    SOL: 185.40,
-    AVAX: 34.15,
-    LINK: 19.85
-  },
+  prices: {}, // Prices will be fetched from live API only
   lastFetched: 0,
   keys: {},
   consecutiveFailures: 0,
-  totalVolumeUSD: 0.00, // starting clean live volume
-  totalRebateUSD: 0.00, // starting clean live rebate
+  totalVolumeUSD: 0.00,
+  totalRebateUSD: 0.00,
   networkLogs: [],
-  orderLogs: []
+  orderLogs: [] // Only real trades from fetchMyTrades()
 };
 
 // --- RATE LIMITER (TOKEN BUCKET ALGORITHM) ---
@@ -113,6 +107,76 @@ app.post('/api/keys', (req, res) => {
   });
 });
 
+// GET real trades from exchange (fetchMyTrades)
+app.get('/api/real-ledger/:exchangeId', async (req, res) => {
+  const { exchangeId } = req.params;
+
+  const keys = store.keys[exchangeId];
+  if (!keys || !keys.apiKey || !keys.apiSecret) {
+    return res.json({
+      status: 'no_keys',
+      trades: [],
+      message: 'API keys not configured'
+    });
+  }
+
+  try {
+    const ExchangeClass = (ccxt as any)[exchangeId];
+    if (!ExchangeClass) {
+      return res.status(400).json({ error: `Exchange ${exchangeId} not supported` });
+    }
+
+    const client = new ExchangeClass({
+      apiKey: keys.apiKey,
+      secret: keys.apiSecret,
+      password: keys.passphrase,
+      enableRateLimit: true
+    });
+
+    // Fetch real trades from exchange
+    const trades = await client.fetchMyTrades();
+
+    // Calculate volume and rebate from real trades
+    let totalVol = 0;
+    let totalRebate = 0;
+
+    trades.forEach((trade: any) => {
+      const tradeVolume = (trade.amount || 0) * (trade.price || 0);
+      totalVol += tradeVolume;
+      totalRebate += tradeVolume * 0.0005; // 0.05% maker rebate
+    });
+
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.fetchMyTrades()`, 'CEX API Gateway', `Fetched ${trades.length} trades`);
+
+    res.json({
+      status: 'live_trades',
+      exchange: exchangeId,
+      totalTrades: trades.length,
+      totalVolume: totalVol.toFixed(2),
+      estimatedRebate: totalRebate.toFixed(4),
+      trades: trades.slice(0, 50).map((t: any) => ({
+        id: t.id,
+        symbol: t.symbol,
+        type: t.type,
+        side: t.side,
+        price: t.price,
+        amount: t.amount,
+        cost: t.cost,
+        fee: t.fee,
+        timestamp: t.timestamp
+      }))
+    });
+  } catch (error: any) {
+    store.consecutiveFailures++;
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.fetchMyTrades()`, 'CEX API Gateway', `ERROR: ${error.message}`);
+    res.status(500).json({
+      error: error.message,
+      status: 'fetch_failed',
+      consecutiveFailures: store.consecutiveFailures
+    });
+  }
+});
+
 // GET stats/logs endpoint
 app.get('/api/stats', (req, res) => {
   res.json({
@@ -124,56 +188,48 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-// Export HFT Maker-Only Rebate Report as CSV
+// Export Real HFT Rebate Report as CSV (Real Data Only)
 app.get('/api/rebate-report/csv', (req, res) => {
   try {
-    const hasLiveKeys = Object.values(store.keys).some(k => k.apiKey && k.apiSecret);
-    const headers = ["ISLEM_TARIHI", "MAKER_HACIMI_USDT", "REBATE_ORANI", "REBATE_USDT", "ISLEM_SAYISI", "DURUM"];
+    const headers = ["TRADE_ID", "TRADE_SYMBOL", "SIDE", "PRICE", "AMOUNT", "COST", "FEE", "TIMESTAMP", "SOURCE"];
     const csvRows: string[] = [];
 
     // Add headers
     csvRows.push(headers.map(h => `"${h}"`).join(","));
 
-    const today = new Date().toISOString().split('T')[0];
-
-    // Report source
-    const reportSource = hasLiveKeys ? "HFT_LIVE_EXCHANGE" : "HFT_SIMULATION";
-    const makerOrdersToday = store.orderLogs.filter(o => o.status === 'COMPLETED').length;
-
-    // Today's row
-    const todayRow = [
-      today,
-      store.totalVolumeUSD.toFixed(2),
-      "0.05%",
-      store.totalRebateUSD.toFixed(4),
-      makerOrdersToday.toString(),
-      reportSource
-    ];
-    csvRows.push(todayRow.map(val => `"${val}"`).join(","));
-
-    // Historical rows
-    for (let i = 1; i <= 6; i++) {
-      const pastDate = new Date();
-      pastDate.setDate(pastDate.getDate() - i);
-      const dateStr = pastDate.toISOString().split('T')[0];
-
-      const dayVolume = (Math.random() * 100000 + 25000).toFixed(2);
-      const dayRebate = (parseFloat(dayVolume) * 0.0005).toFixed(4);
-      const dayOrders = Math.floor(Math.random() * 500 + 50);
-
-      const histRow = [
-        dateStr,
-        dayVolume,
-        "0.05%",
-        dayRebate,
-        dayOrders.toString(),
-        reportSource
-      ];
-      csvRows.push(histRow.map(val => `"${val}"`).join(","));
+    // Only include real trades from store.orderLogs
+    if (store.orderLogs.length === 0) {
+      csvRows.push([
+        "N/A",
+        "N/A",
+        "N/A",
+        "0",
+        "0",
+        "0",
+        "0",
+        new Date().toISOString(),
+        "NO_TRADES"
+      ].map(val => `"${val}"`).join(","));
+    } else {
+      store.orderLogs.forEach(trade => {
+        const row = [
+          trade.id || "N/A",
+          trade.symbol || "UNKNOWN",
+          trade.side || "N/A",
+          (trade.price || 0).toString(),
+          (trade.amount || 0).toString(),
+          (trade.cost || 0).toString(),
+          (trade.fee || 0).toString(),
+          new Date(trade.timestamp || 0).toISOString(),
+          trade.source || "REAL_EXCHANGE"
+        ];
+        csvRows.push(row.map(val => `"${val}"`).join(","));
+      });
     }
 
+    const today = new Date().toISOString().split('T')[0];
     res.setHeader('Content-Type', 'text/csv;charset=utf-8;');
-    res.setHeader('Content-Disposition', `attachment;filename=HFT_Maker_Rebate_Report_${today}.csv`);
+    res.setHeader('Content-Disposition', `attachment;filename=HFT_Real_Trades_${today}.csv`);
     res.send(csvRows.join("\n"));
   } catch (error: any) {
     console.error('CSV export error:', error);
@@ -181,85 +237,78 @@ app.get('/api/rebate-report/csv', (req, res) => {
   }
 });
 
-// GET HFT Maker-Only rebate metrics
+// GET HFT Maker-Only rebate metrics (Real Data Only)
 app.get('/api/volume/metrics', (req, res) => {
   const hasLiveKeys = Object.values(store.keys).some(k => k.apiKey && k.apiSecret);
 
-  // Determine which exchange is active
-  let activeExchange = 'Not Configured';
+  // Determine active exchange
+  let activeExchange = 'NOT CONFIGURED';
+  let liveConnectionStatus = 'OFFLINE';
+
   if (hasLiveKeys) {
-    if (store.keys.binance?.apiKey) activeExchange = 'BINANCE (Live)';
-    else if (store.keys.okx?.apiKey) activeExchange = 'OKX (Live)';
-    else if (store.keys.coinbase?.apiKey) activeExchange = 'COINBASE (Live)';
+    if (store.keys.binance?.apiKey) activeExchange = 'BINANCE';
+    else if (store.keys.okx?.apiKey) activeExchange = 'OKX';
+    else if (store.keys.coinbase?.apiKey) activeExchange = 'COINBASE';
+
+    liveConnectionStatus = store.consecutiveFailures >= 3 ? 'FAIL_SAFE' : 'ACTIVE';
   }
-
-  // Calculate daily distribution
-  const v1 = Math.floor(store.totalVolumeUSD * 0.5 * 100) / 100;
-  const v2 = Math.floor(store.totalVolumeUSD * 0.3 * 100) / 100;
-  const v3 = Math.floor(store.totalVolumeUSD * 0.2 * 100) / 100;
-
-  const r1 = Math.floor(store.totalRebateUSD * 0.5 * 10000) / 10000;
-  const r2 = Math.floor(store.totalRebateUSD * 0.3 * 10000) / 10000;
-  const r3 = Math.floor(store.totalRebateUSD * 0.2 * 10000) / 10000;
 
   res.json({
     totalVolumeUSD: store.totalVolumeUSD,
     totalRebateUSD: store.totalRebateUSD,
-    activePair: 'BTC/USDT (Post-Only Maker)',
+    activePair: 'USDT Pairs (Post-Only Maker)',
     rebateRate: '0.05%',
-    isRebateMode: true,
-    systemMode: 'HFT_MAKER_ONLY',
+    systemMode: 'HFT_MAKER_ONLY_REAL_DATA',
     hasLiveKeys,
     activeExchange,
-    liveSource: 'REAL_EXCHANGE_API',
-    orderLogsCount: store.orderLogs.length,
-    makerOrdersCount: store.orderLogs.filter(o => o.status === 'COMPLETED').length,
-    withdrawalStatus: 'HARD_LOCKED',
-    dailyHistory: [
-      { date: "2026-07-06", volume: v1, rebateRate: "0.05%", rebateEarned: r1, status: "GERÇEK", source: hasLiveKeys ? activeExchange : "SIMÜLASYON" },
-      { date: "2026-07-05", volume: v2, rebateRate: "0.05%", rebateEarned: r2, status: "GERÇEK", source: hasLiveKeys ? activeExchange : "SIMÜLASYON" },
-      { date: "2026-07-04", volume: v3, rebateRate: "0.05%", rebateEarned: r3, status: "GERÇEK", source: hasLiveKeys ? activeExchange : "SIMÜLASYON" }
-    ]
+    liveConnectionStatus,
+    connectionIndicator: hasLiveKeys ? 'CANLI BORSA BAĞLANTISI: AKTİF' : 'API KEY GEREKLI',
+    dataSource: hasLiveKeys ? 'LIVE_CCXT_API' : 'NO_DATA',
+    withdrawalMode: 'MANUAL_APPROVAL_ONLY',
+    failSafeMode: store.consecutiveFailures >= 3,
+    consecutiveFailures: store.consecutiveFailures,
+    note: hasLiveKeys ? 'All data from live exchange API only' : 'No live data - configure API keys'
   });
 });
 
-// Real Public Feed proxy with Redis-like server cache to avoid 429 rate limit
+// Real Public Feed - Live API Only (No Cache, No Mock Data)
 app.get('/api/public-feed', async (req, res) => {
-  const now = Date.now();
-  if (now - store.lastFetched < 4000) {
-    return res.json({ source: 'redis_cache', prices: store.prices });
-  }
-
   try {
     const binanceClient = new ccxt.binance();
     const tickers = await binanceClient.fetchTickers(['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT', 'LINK/USDT']);
-    
-    if (tickers['BTC/USDT']?.last) store.prices.BTC = tickers['BTC/USDT'].last;
-    if (tickers['ETH/USDT']?.last) store.prices.ETH = tickers['ETH/USDT'].last;
-    if (tickers['SOL/USDT']?.last) store.prices.SOL = tickers['SOL/USDT'].last;
-    if (tickers['AVAX/USDT']?.last) store.prices.AVAX = tickers['AVAX/USDT'].last;
-    if (tickers['LINK/USDT']?.last) store.prices.LINK = tickers['LINK/USDT'].last;
-    
-    store.lastFetched = now;
-    addNetworkLog('REST_REQ', 'OUT', 'https://api.binance.com/api/v3/ticker/price', '185.148.241.12', 'Tickers Fetched');
-    
-    res.json({ source: 'live_fetch', prices: store.prices });
+
+    const prices: Record<string, number> = {};
+    if (tickers['BTC/USDT']?.last) prices.BTC = tickers['BTC/USDT'].last;
+    if (tickers['ETH/USDT']?.last) prices.ETH = tickers['ETH/USDT'].last;
+    if (tickers['SOL/USDT']?.last) prices.SOL = tickers['SOL/USDT'].last;
+    if (tickers['AVAX/USDT']?.last) prices.AVAX = tickers['AVAX/USDT'].last;
+    if (tickers['LINK/USDT']?.last) prices.LINK = tickers['LINK/USDT'].last;
+
+    addNetworkLog('REST_REQ', 'OUT', 'Binance fetchTickers()', 'Binance API', 'Live Data Fetched');
+
+    res.json({ source: 'live_binance_api', prices });
   } catch (error: any) {
-    console.warn('CCXT public price query fell back to OKX:', error.message);
+    console.warn('Binance API error, trying OKX:', error.message);
     try {
       const okxClient = new ccxt.okx();
       const okxData = await okxClient.fetchTickers(['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT', 'LINK/USDT']);
-      
-      if (okxData['BTC/USDT']?.last) store.prices.BTC = okxData['BTC/USDT'].last;
-      if (okxData['ETH/USDT']?.last) store.prices.ETH = okxData['ETH/USDT'].last;
-      if (okxData['SOL/USDT']?.last) store.prices.SOL = okxData['SOL/USDT'].last;
-      if (okxData['AVAX/USDT']?.last) store.prices.AVAX = okxData['AVAX/USDT'].last;
-      if (okxData['LINK/USDT']?.last) store.prices.LINK = okxData['LINK/USDT'].last;
-      
-      store.lastFetched = now;
-      res.json({ source: 'okx_fallback', prices: store.prices });
+
+      const prices: Record<string, number> = {};
+      if (okxData['BTC/USDT']?.last) prices.BTC = okxData['BTC/USDT'].last;
+      if (okxData['ETH/USDT']?.last) prices.ETH = okxData['ETH/USDT'].last;
+      if (okxData['SOL/USDT']?.last) prices.SOL = okxData['SOL/USDT'].last;
+      if (okxData['AVAX/USDT']?.last) prices.AVAX = okxData['AVAX/USDT'].last;
+      if (okxData['LINK/USDT']?.last) prices.LINK = okxData['LINK/USDT'].last;
+
+      addNetworkLog('REST_REQ', 'OUT', 'OKX fetchTickers()', 'OKX API', 'Live Data Fetched');
+      res.json({ source: 'live_okx_api', prices });
     } catch (okxErr) {
-      res.json({ source: 'static_fallback', prices: store.prices });
+      addNetworkLog('REST_REQ', 'OUT', 'Public Feed', 'API Gateway', `FAIL-SAFE: ${(okxErr as any).message}`);
+      res.status(503).json({
+        error: 'Unable to fetch live prices from any exchange',
+        source: 'FAIL_SAFE',
+        prices: {}
+      });
     }
   }
 });
@@ -328,133 +377,152 @@ app.post('/api/ccxt/balance', async (req, res) => {
   }
 });
 
-// Withdrawal endpoint - HARD-LOCKED (No fund transfers allowed)
-app.post('/api/ccxt/withdraw', (req, res) => {
-  res.status(403).json({
-    error: 'Withdrawal is permanently disabled',
-    message: 'Para çekme işlemi sistem seviyesinde kilitli. HFT Maker-Only modunda sadece rebate kazanç vardır.',
-    status: 'HARD_LOCKED',
-    mode: 'HFT_MAKER_ONLY',
-    rebateAccumulation: 'Active - Rebate earnings accumulate in exchange wallet'
-  });
-});
+// Manual Withdrawal (User-Approved Only - No Automation)
+app.post('/api/manual-withdraw', async (req, res) => {
+  const { exchangeId, amount, address, coin = 'USDT', network = 'TRC20' } = req.body;
 
-// Live CCXT Maker-Only Trading engine (Rebate Farming)
-app.post('/api/ccxt/trade', async (req, res) => {
-  const { exchangeId, asset, side, price, quantity, type = 'limit', referralId } = req.body;
-
-  if (!exchangeId || !asset || !side || !price || !quantity) {
-    return res.status(400).json({ error: 'Missing trade parameters' });
-  }
-
-  if (!ccxtLimiter.consume()) {
-    return res.status(429).json({ error: 'Rate limit bucket exhausted. Order queued.' });
+  if (!exchangeId || !amount || !address) {
+    return res.status(400).json({ error: 'exchangeId, amount, and address required' });
   }
 
   const keys = store.keys[exchangeId];
-  const isRealExecution = keys && keys.apiKey && keys.apiSecret;
+  if (!keys || !keys.apiKey || !keys.apiSecret) {
+    return res.status(400).json({ error: `API keys not configured for ${exchangeId}` });
+  }
 
-  const tradeUSDAmount = price * quantity;
-  const computedFee = tradeUSDAmount * 0.00075; // Maker fee
-  const computedRebate = tradeUSDAmount * 0.0005; // 0.05% Rebate share
+  try {
+    const ExchangeClass = (ccxt as any)[exchangeId];
+    const client = new ExchangeClass({
+      apiKey: keys.apiKey,
+      secret: keys.apiSecret,
+      password: keys.passphrase,
+      enableRateLimit: true
+    });
 
-  if (isRealExecution) {
-    try {
-      const ExchangeClass = (ccxt as any)[exchangeId];
-      const client = new ExchangeClass({
-        apiKey: keys.apiKey,
-        secret: keys.apiSecret,
-        password: keys.passphrase,
-        enableRateLimit: true
-      });
+    // Attempt manual withdrawal (requires user approval before calling this)
+    const withdrawResult = await client.withdraw(
+      coin,
+      amount,
+      address,
+      undefined,
+      { network }
+    );
 
-      const marketSymbol = `${asset}/USDT`;
-
-      // Execute the order as Maker-Only (Post-Only)
-      const ccxtOrder = await client.createOrder(
-        marketSymbol,
-        type,
-        side.toLowerCase(),
-        quantity,
-        price,
-        { 'postOnly': true } // Hard-enforce Maker mode for rebate
-      );
-
-      store.consecutiveFailures = 0;
-      store.totalVolumeUSD += tradeUSDAmount;
-      store.totalRebateUSD += computedRebate;
-
-      const orderLog = {
-        id: ccxtOrder.id || `maker-${Date.now()}`,
-        timestamp: Date.now(),
-        asset,
-        type: side.toUpperCase(),
-        exchange: exchangeId,
-        price,
-        quantity,
-        fee: computedFee,
-        feeAsset: 'USDT',
-        latencyUs: Math.floor(Math.random() * 80000 + 20000),
-        status: 'COMPLETED',
-        txHash: ccxtOrder.txid || `0x${Math.random().toString(16).substring(2, 10)}maker`
-      };
-
-      store.orderLogs.unshift(orderLog);
-      addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder(${marketSymbol}, post-only)`, 'CEX API Gateway', 'MAKER ORDER EXECUTED');
-
-      res.json({
-        status: 'maker_order_executed',
-        order: orderLog,
-        rebateEarned: computedRebate,
-        stats: {
-          totalVolumeUSD: store.totalVolumeUSD,
-          totalRebateUSD: store.totalRebateUSD
-        },
-        mode: 'MAKER_ONLY_REBATE'
-      });
-    } catch (error: any) {
-      store.consecutiveFailures++;
-      addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder()`, 'CEX API Gateway', `ERROR: ${error.message}`);
-
-      const isFailSafeTriggered = store.consecutiveFailures >= 3;
-      res.status(500).json({
-        error: error.message,
-        consecutiveFailures: store.consecutiveFailures,
-        failSafeShutdown: isFailSafeTriggered
-      });
-    }
-  } else {
-    // Simulation mode (no API keys)
-    store.totalVolumeUSD += tradeUSDAmount;
-    store.totalRebateUSD += computedRebate;
-
-    const orderLog = {
-      id: `sim-maker-${Date.now()}`,
-      timestamp: Date.now(),
-      asset,
-      type: side.toUpperCase(),
-      exchange: exchangeId,
-      price,
-      quantity,
-      fee: computedFee,
-      feeAsset: 'USDT',
-      latencyUs: Math.floor(Math.random() * 90000 + 10000),
-      status: 'COMPLETED',
-      txHash: `0xsim${Math.random().toString(16).substring(2, 10)}`
-    };
-
-    store.orderLogs.unshift(orderLog);
-    addNetworkLog('REST_REQ', 'IN', `/api/ccxt/trade?simulated=true&referral=${referralId || 'none'}`, '127.0.0.1', 'SIM MAKER ORDER');
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.withdraw(${coin}, ${amount}, ${address})`, 'CEX API Gateway', 'MANUAL WITHDRAW INITIATED');
 
     res.json({
-      status: 'simulation_mode',
-      order: orderLog,
-      rebateEarned: computedRebate,
-      stats: {
-        totalVolumeUSD: store.totalVolumeUSD,
-        totalRebateUSD: store.totalRebateUSD
-      },
-      mode: 'SIMULATION'
+      status: 'withdraw_initiated',
+      exchange: exchangeId,
+      amount,
+      address,
+      coin,
+      network,
+      withdrawId: withdrawResult.id,
+      message: 'Manual withdrawal initiated. Check exchange account for confirmation.'
+    });
+  } catch (error: any) {
+    store.consecutiveFailures++;
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.withdraw()`, 'CEX API Gateway', `ERROR: ${error.message}`);
+    res.status(500).json({
+      error: error.message,
+      status: 'withdraw_failed',
+      message: 'Withdrawal failed. Check address, amount, and exchange settings.'
+    });
+  }
+});
+
+// Post-Only (Maker-Only) Order Execution - Real API Only
+app.post('/api/ccxt/trade', async (req, res) => {
+  const { exchangeId, asset, side, price, quantity } = req.body;
+
+  if (!exchangeId || !asset || !side || !price || !quantity) {
+    return res.status(400).json({ error: 'Missing trade parameters: exchangeId, asset, side, price, quantity' });
+  }
+
+  if (!ccxtLimiter.consume()) {
+    return res.status(429).json({ error: 'Rate limit exceeded' });
+  }
+
+  const keys = store.keys[exchangeId];
+  if (!keys || !keys.apiKey || !keys.apiSecret) {
+    return res.status(400).json({
+      error: 'API keys not configured',
+      message: `Configure API keys for ${exchangeId} first`
+    });
+  }
+
+  try {
+    const ExchangeClass = (ccxt as any)[exchangeId];
+    const client = new ExchangeClass({
+      apiKey: keys.apiKey,
+      secret: keys.apiSecret,
+      password: keys.passphrase,
+      enableRateLimit: true
+    });
+
+    const marketSymbol = `${asset}/USDT`;
+
+    // Verify balance before attempting trade
+    const balance = await client.fetchBalance();
+    const availableBalance = balance.free['USDT'] || 0;
+    const orderCost = price * quantity;
+
+    if (availableBalance < orderCost) {
+      addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder()`, 'CEX API Gateway', `INSUFFICIENT_BALANCE`);
+      return res.status(400).json({
+        error: 'Insufficient balance',
+        required: orderCost.toFixed(2),
+        available: availableBalance.toFixed(2)
+      });
+    }
+
+    // Execute Post-Only Maker order
+    const ccxtOrder = await client.createOrder(
+      marketSymbol,
+      'limit',
+      side.toLowerCase(),
+      quantity,
+      price,
+      { 'postOnly': true }
+    );
+
+    store.consecutiveFailures = 0;
+
+    // Store the real order (will be verified by fetchMyTrades later)
+    const orderRecord = {
+      id: ccxtOrder.id,
+      symbol: marketSymbol,
+      side: side.toUpperCase(),
+      price,
+      amount: quantity,
+      cost: price * quantity,
+      fee: ccxtOrder.fee,
+      timestamp: ccxtOrder.timestamp,
+      source: exchangeId
+    };
+
+    store.orderLogs.unshift(orderRecord);
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder(${marketSymbol}, postOnly)`, 'CEX API Gateway', `REAL_ORDER: ${ccxtOrder.id}`);
+
+    res.json({
+      status: 'post_only_order_sent',
+      order: orderRecord,
+      message: 'Real Post-Only order sent to exchange. Use /api/real-ledger to verify execution.',
+      mode: 'REAL_DATA_ONLY'
+    });
+  } catch (error: any) {
+    store.consecutiveFailures++;
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder()`, 'CEX API Gateway', `FAILED: ${error.message}`);
+
+    // Fail-safe trigger
+    if (store.consecutiveFailures >= 3) {
+      addNetworkLog('FAIL_SAFE', 'IN', 'Emergency Stop', 'System', 'FAIL_SAFE_TRIGGERED');
+    }
+
+    res.status(500).json({
+      error: error.message,
+      status: 'order_failed',
+      failSafeActive: store.consecutiveFailures >= 3
     });
   }
 });
