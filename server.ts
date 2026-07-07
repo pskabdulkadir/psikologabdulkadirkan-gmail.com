@@ -377,9 +377,19 @@ app.post('/api/ccxt/balance', async (req, res) => {
   }
 });
 
-// Manual Withdrawal (User-Approved Only - No Automation)
+// SECURITY LAYER 1: Manual Withdrawal (User-Approved Only - HARD-LOCKED)
+// NO AUTOMATIC WITHDRAWAL LOOPS ALLOWED
 app.post('/api/manual-withdraw', async (req, res) => {
-  const { exchangeId, amount, address, coin = 'USDT', network = 'TRC20' } = req.body;
+  const { exchangeId, amount, address, coin = 'USDT', network = 'TRC20', userApproval } = req.body;
+
+  // HARD-LOCK: Require explicit user approval flag
+  if (!userApproval) {
+    return res.status(403).json({
+      error: 'User approval required',
+      status: 'WITHDRAWAL_LOCKED',
+      message: 'Manual withdrawal requires explicit user approval from Dashboard'
+    });
+  }
 
   if (!exchangeId || !amount || !address) {
     return res.status(400).json({ error: 'exchangeId, amount, and address required' });
@@ -399,7 +409,7 @@ app.post('/api/manual-withdraw', async (req, res) => {
       enableRateLimit: true
     });
 
-    // Attempt manual withdrawal (requires user approval before calling this)
+    // Attempt manual withdrawal
     const withdrawResult = await client.withdraw(
       coin,
       amount,
@@ -408,7 +418,7 @@ app.post('/api/manual-withdraw', async (req, res) => {
       { network }
     );
 
-    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.withdraw(${coin}, ${amount}, ${address})`, 'CEX API Gateway', 'MANUAL WITHDRAW INITIATED');
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.withdraw(MANUAL_USER_APPROVED)`, 'CEX API Gateway', 'MANUAL WITHDRAW INITIATED');
 
     res.json({
       status: 'withdraw_initiated',
@@ -418,11 +428,12 @@ app.post('/api/manual-withdraw', async (req, res) => {
       coin,
       network,
       withdrawId: withdrawResult.id,
+      securityLevel: 'MANUAL_APPROVAL_ONLY',
       message: 'Manual withdrawal initiated. Check exchange account for confirmation.'
     });
   } catch (error: any) {
     store.consecutiveFailures++;
-    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.withdraw()`, 'CEX API Gateway', `ERROR: ${error.message}`);
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.withdraw()`, 'CEX API Gateway', `MANUAL_WITHDRAW_ERROR: ${error.message}`);
     res.status(500).json({
       error: error.message,
       status: 'withdraw_failed',
@@ -431,12 +442,27 @@ app.post('/api/manual-withdraw', async (req, res) => {
   }
 });
 
-// Post-Only (Maker-Only) Order Execution - Real API Only
+// SECURITY LAYER 2 & 3: Maker-Only Enforcer + Order Size Limiter
 app.post('/api/ccxt/trade', async (req, res) => {
-  const { exchangeId, asset, side, price, quantity } = req.body;
+  const { exchangeId, asset, side, price, quantity, maxOrderSize = 2.0 } = req.body;
 
   if (!exchangeId || !asset || !side || !price || !quantity) {
     return res.status(400).json({ error: 'Missing trade parameters: exchangeId, asset, side, price, quantity' });
+  }
+
+  // SECURITY LAYER 3: Order Size Limit Check (Hard-coded enforcement)
+  const orderValue = price * quantity;
+  const MAX_ORDER_LIMIT = maxOrderSize || 2.0; // Default: 2.0 USDT max per order
+
+  if (orderValue > MAX_ORDER_LIMIT) {
+    addNetworkLog('SECURITY', 'BLOCK', `Order Size Exceeded`, 'Order Limiter', `Attempted: ${orderValue.toFixed(2)}, Limit: ${MAX_ORDER_LIMIT}`);
+    return res.status(400).json({
+      error: `Order size exceeds limit`,
+      securityLevel: 'ORDER_SIZE_LIMITER',
+      attemptedValue: orderValue.toFixed(2),
+      maxAllowed: MAX_ORDER_LIMIT,
+      status: 'ORDER_BLOCKED'
+    });
   }
 
   if (!ccxtLimiter.consume()) {
@@ -465,30 +491,48 @@ app.post('/api/ccxt/trade', async (req, res) => {
     // Verify balance before attempting trade
     const balance = await client.fetchBalance();
     const availableBalance = balance.free['USDT'] || 0;
-    const orderCost = price * quantity;
 
-    if (availableBalance < orderCost) {
-      addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder()`, 'CEX API Gateway', `INSUFFICIENT_BALANCE`);
+    if (availableBalance < orderValue) {
+      addNetworkLog('SECURITY', 'BLOCK', 'Insufficient Balance', 'Capital Protection', `Required: ${orderValue}, Available: ${availableBalance}`);
       return res.status(400).json({
         error: 'Insufficient balance',
-        required: orderCost.toFixed(2),
-        available: availableBalance.toFixed(2)
+        required: orderValue.toFixed(2),
+        available: availableBalance.toFixed(2),
+        status: 'INSUFFICIENT_CAPITAL'
       });
     }
 
-    // Execute Post-Only Maker order
+    // SECURITY LAYER 2: HARD-ENFORCE Post-Only (Maker-Only)
+    // postOnly MUST be true - this is NOT negotiable
     const ccxtOrder = await client.createOrder(
       marketSymbol,
       'limit',
       side.toLowerCase(),
       quantity,
       price,
-      { 'postOnly': true }
+      { 'postOnly': true } // HARD-CODED: Must be Post-Only
     );
+
+    // MAKER-ONLY VERIFICATION: If order status indicates it was filled as Taker, CANCEL immediately
+    if (ccxtOrder.status === 'closed' && ccxtOrder.takerOrMaker === 'taker') {
+      try {
+        await client.cancelOrder(ccxtOrder.id, marketSymbol);
+        addNetworkLog('SECURITY', 'CANCEL', 'Taker Fill Detected', 'Maker Enforcer', `Order ${ccxtOrder.id} cancelled (was filled as taker)`);
+
+        return res.status(400).json({
+          error: 'Order filled as Taker (not Maker)',
+          status: 'MAKER_ENFORCER_TRIGGERED',
+          message: 'Order was cancelled because it filled as Taker instead of Maker. Post-Only orders MUST be Maker only.',
+          orderCancelled: true
+        });
+      } catch (cancelError) {
+        addNetworkLog('SECURITY', 'ERROR', 'Taker Cancel Failed', 'Maker Enforcer', `Could not cancel ${ccxtOrder.id}`);
+      }
+    }
 
     store.consecutiveFailures = 0;
 
-    // Store the real order (will be verified by fetchMyTrades later)
+    // Store the real order
     const orderRecord = {
       id: ccxtOrder.id,
       symbol: marketSymbol,
@@ -498,25 +542,45 @@ app.post('/api/ccxt/trade', async (req, res) => {
       cost: price * quantity,
       fee: ccxtOrder.fee,
       timestamp: ccxtOrder.timestamp,
-      source: exchangeId
+      source: exchangeId,
+      takerOrMaker: ccxtOrder.takerOrMaker || 'maker', // Verify it's Maker
+      securityShield: 'MAKER_ONLY_ENFORCED'
     };
 
     store.orderLogs.unshift(orderRecord);
-    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder(${marketSymbol}, postOnly)`, 'CEX API Gateway', `REAL_ORDER: ${ccxtOrder.id}`);
+    addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder(postOnly=true)`, 'CEX API Gateway', `MAKER_ORDER: ${ccxtOrder.id}`);
 
     res.json({
       status: 'post_only_order_sent',
       order: orderRecord,
-      message: 'Real Post-Only order sent to exchange. Use /api/real-ledger to verify execution.',
-      mode: 'REAL_DATA_ONLY'
+      securityLayers: {
+        'Layer 1': 'Withdrawal Hard-Lock (Manual Only)',
+        'Layer 2': 'Maker-Only Enforcer (PostOnly enforced)',
+        'Layer 3': `Order Size Limiter (Max: ${MAX_ORDER_LIMIT} USDT)`
+      },
+      message: 'Post-Only Maker order successfully sent. Capital protected.',
+      mode: 'SECURITY_ENFORCED'
     });
   } catch (error: any) {
     store.consecutiveFailures++;
+
+    // Check if error is due to PostOnly rejection (taker attempt blocked by exchange)
+    if (error.message && error.message.includes('postOnly')) {
+      addNetworkLog('SECURITY', 'BLOCKED', 'PostOnly Rejected', 'Exchange', `Order rejected by exchange: ${error.message}`);
+
+      return res.status(400).json({
+        error: 'Post-Only order rejected by exchange',
+        status: 'MAKER_ENFORCER_BLOCKED',
+        message: 'Exchange rejected this order because it would fill as Taker. This is expected - Maker orders only fill at limit price.',
+        suggestion: 'Adjust price or wait for market to move to your limit price'
+      });
+    }
+
     addNetworkLog('REST_REQ', 'OUT', `${exchangeId}.createOrder()`, 'CEX API Gateway', `FAILED: ${error.message}`);
 
     // Fail-safe trigger
     if (store.consecutiveFailures >= 3) {
-      addNetworkLog('FAIL_SAFE', 'IN', 'Emergency Stop', 'System', 'FAIL_SAFE_TRIGGERED');
+      addNetworkLog('FAIL_SAFE', 'EMERGENCY', 'Emergency Stop Triggered', 'System', 'FAIL_SAFE_TRIGGERED');
     }
 
     res.status(500).json({

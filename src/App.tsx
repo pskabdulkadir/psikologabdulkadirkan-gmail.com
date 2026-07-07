@@ -274,6 +274,12 @@ export default function App() {
     return '5.00';
   });
 
+  // SECURITY: Max Order Size Limiter (Settings)
+  const [maxOrderSize, setMaxOrderSize] = useState<string>(() => {
+    const saved = localStorage.getItem('secure_max_order_size');
+    return saved || '2.0'; // Default: 2.0 USDT max per order
+  });
+
   const [tempWallet, setTempWallet] = useState<string>(localStorage.getItem('secure_whitelisted_wallet') || '');
   const [walletSavedMessage, setWalletSavedMessage] = useState<string>('');
   const [apiKeysVisible, setApiKeysVisible] = useState<boolean>(false);
@@ -2270,7 +2276,7 @@ export default function App() {
 
                   {/* Manual Withdrawal Button */}
                   {engineConfig.whitelistedWallet && (
-                    <div className="mt-4 pt-4 border-t border-gray-900">
+                    <div className="mt-4 pt-4 border-t border-gray-900 space-y-3">
                       <button
                         onClick={() => {
                           const confirmWithdraw = window.confirm(
@@ -2284,9 +2290,32 @@ export default function App() {
                       >
                         🔓 MANUEL ÇEKIM (USER APPROVAL)
                       </button>
-                      <p className="text-[9px] text-amber-400/60 mt-2 leading-relaxed">
+                      <p className="text-[9px] text-amber-400/60 leading-relaxed">
                         Otonom çekim yoktur. Tüm çekimler manuel olarak, kullanıcı onayı ile gerçekleşir.
                       </p>
+
+                      {/* SECURITY: Max Order Size Limiter */}
+                      <div className="bg-red-950/20 border border-red-500/30 rounded-lg p-3 space-y-2">
+                        <label className="block text-red-400 text-[10px] uppercase font-bold">🛡️ Max Order Size (USDT) - Sermaye Koruma</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={maxOrderSize}
+                            onChange={(e) => {
+                              setMaxOrderSize(e.target.value);
+                              localStorage.setItem('secure_max_order_size', e.target.value);
+                            }}
+                            className="flex-1 bg-black border border-red-500/40 p-2 rounded text-red-400 text-[11px] focus:border-red-500 outline-none font-mono"
+                            placeholder="Örn: 2.0"
+                          />
+                          <span className="text-red-400 font-bold self-center text-[10px]">USDT</span>
+                        </div>
+                        <p className="text-[9px] text-red-300 leading-relaxed">
+                          Her işlem bu limiti aşamaz. Varsayılan: 2.0 USDT. Ayarla ve kaydet.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
