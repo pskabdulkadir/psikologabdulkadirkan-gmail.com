@@ -172,6 +172,13 @@ export default function App() {
         if (resMetrics.ok) {
           const metricsData = await resMetrics.json();
           setRebateMetrics(metricsData);
+
+          // Log LIVE_MODE status
+          if (metricsData.liveMode === 'ACTIVE') {
+            console.log(`✅ LIVE_MODE: ACTIVE | Bağlantı Kaynağı: ${metricsData.liveSource} | Hacim: $${metricsData.totalVolumeUSD.toFixed(2)} | Rebate: $${metricsData.totalRebateUSD.toFixed(4)}`);
+          } else {
+            console.log(`⚙️  VAULT_MEM Mode | Yapılandırma bekleniyor...`);
+          }
         }
       } catch (e) {
         console.warn('Failed to poll stats:', e);
@@ -182,49 +189,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleExportCSV = () => {
-    // Define CSV headers
-    const headers = ["ISLEM TARIHI", "KAZANILAN HACIM (USDT)", "IADE ORANI", "BIRIKEN REBATE TUTARI (USDT)", "BAGLANTI KAYNAGI", "DURUM"];
-    
-    // Collect history records
-    let rows: any[] = [];
-    if (rebateMetrics && rebateMetrics.dailyHistory && rebateMetrics.dailyHistory.length > 0) {
-      rows = rebateMetrics.dailyHistory.map(h => [
-        h.date,
-        h.volume.toString(),
-        h.rebateRate,
-        h.rebateEarned.toFixed(4),
-        h.source,
-        h.status
-      ]);
-    } else {
-      // Fallback/Current day live data
-      const hasKeys = (engineConfig.apiKeys.binance?.apiKey || engineConfig.apiKeys.okx?.apiKey || engineConfig.apiKeys.coinbase?.apiKey) ? 'CEX_API_STREAM' : 'SECURE_VAULT_RAM';
-      rows.push([
-        "Bugun (Canli Akis)",
-        totalVolumeUSD.toString(),
-        "0.05%",
-        rebateEarnedUSD.toFixed(4),
-        hasKeys,
-        "CREDITED"
-      ]);
+  const handleExportCSV = async () => {
+    try {
+      const response = await fetch('/api/rebate-report/csv');
+      if (!response.ok) throw new Error('CSV export failed');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Live_Rebate_Raporu_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('CSV export error:', error);
+      alert('CSV raporu indirilemedi. Lütfen tekrar deneyin.');
     }
-    
-    // Format as CSV content
-    const csvRows = [headers.join(",")];
-    for (const row of rows) {
-      csvRows.push(row.map((val: string) => `"${val.replace(/"/g, '""')}"`).join(","));
-    }
-    
-    const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Borsa_Rebate_Raporu_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   };
 
   const [referralIds, setReferralIds] = useState<{ binance: string; okx: string; coinbase: string }>(() => {
@@ -1160,6 +1142,19 @@ export default function App() {
 
           {/* Engine Power Switch & Quick Stats */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* System Mode Status */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-mono ${
+              engineConfig.systemEnvironment === 'SECURE_REBATE'
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-400'
+                : 'bg-amber-950/40 border-amber-500/40 text-amber-400'
+            }`}>
+              <span className="opacity-70">SİSTEM:</span>
+              <span className="font-bold">{engineConfig.systemEnvironment === 'SECURE_REBATE' ? 'MAKER-REBATE' : 'SİM MODE'}</span>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{
+                backgroundColor: engineConfig.systemEnvironment === 'SECURE_REBATE' ? '#4ade80' : '#fbbf24'
+              }} />
+            </div>
+
             {/* Quick Status */}
             <div className="flex items-center gap-2 bg-gray-900 px-3 py-2 rounded-lg border border-gray-800 text-xs font-mono">
               <span className="text-gray-500">BİRİKEN KÂR:</span>
@@ -1288,39 +1283,39 @@ export default function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Kart 1: Demo / Simulation */}
-            <div 
+            <div
               onClick={() => {
                 setEngineConfig(prev => ({ ...prev, systemEnvironment: 'SIMULATION_DEMO' }));
               }}
               className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
                 engineConfig.systemEnvironment === 'SIMULATION_DEMO'
-                  ? 'bg-emerald-950/20 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
+                  ? 'bg-amber-950/20 border-amber-500/40 shadow-lg shadow-amber-500/5'
                   : 'bg-black/40 border-gray-900 hover:border-gray-800'
               }`}
             >
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-gray-200 font-mono">1. SANAL SİMÜLASYON (DEMO)</h4>
-                  <input 
-                    type="radio" 
-                    checked={engineConfig.systemEnvironment === 'SIMULATION_DEMO'} 
+                  <h4 className="text-xs font-bold text-amber-200 font-mono">1. SİMÜLASYON (TEST MODU)</h4>
+                  <input
+                    type="radio"
+                    checked={engineConfig.systemEnvironment === 'SIMULATION_DEMO'}
                     onChange={() => {}}
-                    className="accent-emerald-500"
+                    className="accent-amber-500"
                   />
                 </div>
                 <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Borsa derinlik verilerini ve likidite havuzlarını yerel simülatör ile taklit eder. Hiçbir API bağlantısı kurmadan test etmeniz için ideal eğitim ortamıdır.
+                  Maker-Only emirlerini simüle eder. Gerçek işlem gönderimi olmadan rebate kazanım testi yapabilirsiniz. API key olmadan çalışır.
                 </p>
               </div>
-              <div className="text-[10px] text-gray-500 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Sanal Bakiye &bull; 0% Risk &bull; API Gerekmez
+              <div className="text-[10px] text-amber-500/80 mt-4 pt-2 border-t border-gray-900 font-mono">
+                &bull; Sanal Emirler &bull; Sıfır Risk &bull; API Gerekli Değil
               </div>
             </div>
 
-            {/* Kart 2: Secure Rebate Mode */}
-            <div 
+            {/* Kart 2: Maker-Only Rebate Farming */}
+            <div
               onClick={() => {
                 setEngineConfig(prev => ({ ...prev, systemEnvironment: 'SECURE_REBATE' }));
               }}
@@ -1332,50 +1327,20 @@ export default function App() {
             >
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-emerald-400 font-mono">2. GÜVENLİ REBATE VE HACİM MODU</h4>
-                  <input 
-                    type="radio" 
-                    checked={engineConfig.systemEnvironment === 'SECURE_REBATE'} 
+                  <h4 className="text-xs font-bold text-emerald-400 font-mono">2. MAKER-ONLY REBATE FARMING</h4>
+                  <input
+                    type="radio"
+                    checked={engineConfig.systemEnvironment === 'SECURE_REBATE'}
                     onChange={() => {}}
                     className="accent-emerald-500"
                   />
                 </div>
                 <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Cüzdan bakiyenizi <strong>kesinlikle riske atmaz</strong>. Sadece Market Maker iade programlarını tetiklemek için strictly Read-Only API'ler ile komisyon iadelerini toplar ve cüzdanınıza aktarır.
+                  Post-Only limit emirler göndererek borsa rebate'i kazanır. API Key ile gerçek işlem yapar (Withdrawal hard-locked). fetchBalance ile otomatik bakiye kontrol.
                 </p>
               </div>
               <div className="text-[10px] text-emerald-500/80 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Sıfır Sermaye &bull; Kaldıraç Engelli &bull; $10 Havuz Hibesi Aktif
-              </div>
-            </div>
-
-            {/* Kart 3: CCXT Live Trading Mode */}
-            <div 
-              onClick={() => {
-                setEngineConfig(prev => ({ ...prev, systemEnvironment: 'CCXT_LIVE' }));
-              }}
-              className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                engineConfig.systemEnvironment === 'CCXT_LIVE'
-                  ? 'bg-emerald-950/20 border-emerald-500/40 shadow-lg shadow-emerald-500/5'
-                  : 'bg-black/40 border-gray-900 hover:border-gray-800'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-amber-400 font-mono">3. CCXT LIVE-TRADING ENGINE</h4>
-                  <input 
-                    type="radio" 
-                    checked={engineConfig.systemEnvironment === 'CCXT_LIVE'} 
-                    onChange={() => {}}
-                    className="accent-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                  Gerçek borsa API Key'lerinizle CCXT entegrasyonu üzerinden canlı emir gönderir. <code>fetchBalance()</code> ile borsa cüzdan bakiyelerinizi anlık çeker. FALE otonom çekim tetikler.
-                </p>
-              </div>
-              <div className="text-[10px] text-amber-500/80 mt-4 pt-2 border-t border-gray-900 font-mono">
-                &bull; Gerçek CCXT Sürücüsü &bull; POST /order Aktif &bull; .env Güvenli
+                &bull; Gerçek İşlem &bull; Rebate Kazanç &bull; Maker-Only
               </div>
             </div>
           </div>
@@ -2405,15 +2370,15 @@ export default function App() {
                   </form>
                 </div>
 
-                {/* Secure Environmental API Key Cryptography Store */}
+                {/* Maker-Only Rebate Farming Engine */}
                 <div className="bg-gray-950 border border-gray-900 rounded-xl p-5 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-900 pb-4 gap-2">
                     <div>
                       <h3 className="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
                         <Cpu className="w-4 h-4 text-emerald-400" />
-                        ŞİFRELİ CEX ANAHTAR HAFIZASI
+                        MAKER-ONLY REBATE FARMING MOTORU
                       </h3>
-                      <p className="text-[10px] text-gray-500 mt-0.5">API keys strictly run inside client sandbox memory</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">API Keys: Spot Trading (Read/Write) - Withdrawal Hard-Locked</p>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -2422,7 +2387,7 @@ export default function App() {
                         onClick={loadOpenSourceTestKeys}
                         className="bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/35 text-[10px] font-mono px-2.5 py-1 rounded transition cursor-pointer font-bold uppercase"
                       >
-                        ⚡ AÇIK KAYNAK TESTNET KEY YÜKLE
+                        ⚡ SANDBOX KEY YÜKLE (TEST)
                       </button>
                       <button
                         type="button"
@@ -2436,50 +2401,50 @@ export default function App() {
                   </div>
 
                   <p className="text-[10px] text-gray-400 font-mono leading-relaxed">
-                    Borsa bağlantılarınız için <strong>açık kaynak CCXT sürücüleri</strong> kullanılmaktadır. Anahtarlar tarayıcı local RAM belleğinde şifrelenir ve asla harici sunuculara veya izleme servislerine gönderilmez.
+                    Borsa bağlantıları CCXT açık kaynak sürücüleri üzerinden yapılır. API anahtarları tarayıcı RAM belleğinde şifrelenir. Para çekme (Withdrawal) işlemi backend seviyesinde sertleştirilmiştir (Hard-Lock).
                   </p>
 
                   {/* API Authorization Level Selector */}
                   <div className="bg-black/50 border border-gray-900 rounded-lg p-3 space-y-2">
-                    <span className="text-[9px] text-gray-400 uppercase font-bold block font-mono">İŞLEM YETKİSİ SEVİYESİ (API PERMISSION LEVEL)</span>
+                    <span className="text-[9px] text-gray-400 uppercase font-bold block font-mono">İŞLEM YETKİSİ SEVİYESİ</span>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
                       <button
                         type="button"
                         id="btn-permission-read-only"
                         onClick={() => {
                           setApiPermissionLevel('read_only');
-                          alert('🛡️ Güvenli Sadece Okuma Modu Seçildi! Sistem borsa hesabınızda kesinlikle gerçek alım/satım yapmaz (Yazma yetkisi gerekmez). Sadece hacim ve rebate takibi yapar.');
+                          alert('🛡️ Sadece Okuma Modu! Sistem sadece bakiye okur, işlem yapmaz.');
                         }}
                         className={`p-2 rounded border text-center transition ${
                           apiPermissionLevel === 'read_only'
-                            ? 'bg-emerald-500/15 border-emerald-500 text-emerald-400 font-bold'
+                            ? 'bg-blue-500/15 border-blue-500 text-blue-400 font-bold'
                             : 'bg-transparent border-gray-900 text-gray-500 hover:text-gray-300'
                         }`}
                       >
-                        🛡️ Sadece Okuma (Read-Only)
-                        <span className="block text-[8px] text-gray-500 font-normal mt-0.5">Yazma Yetkisi Gerekmez</span>
+                        🛡️ Sadece Okuma
+                        <span className="block text-[8px] text-gray-500 font-normal mt-0.5">Balans Kontrol</span>
                       </button>
                       <button
                         type="button"
                         id="btn-permission-live-trade"
                         onClick={() => {
                           setApiPermissionLevel('live_trade');
-                          alert('⚠️ Aktif Alım-Satım Modu Seçildi! Girdiğiniz API anahtarlarının spot işlem (Trade) yetkisi açık olmalıdır. Cüzdan güvenliğiniz için para çekme (Withdraw) yetkisini KAPALI tuttuğunuzdan emin olun.');
+                          alert('⚡ Maker-Only İşlem Modu! Sistem Spot Trading yapacak (Withdrawal hard-locked). Post-Only emirler gönderecektir.');
                         }}
                         className={`p-2 rounded border text-center transition ${
                           apiPermissionLevel === 'live_trade'
-                            ? 'bg-amber-500/15 border-amber-500 text-amber-400 font-bold'
+                            ? 'bg-emerald-500/15 border-emerald-500 text-emerald-400 font-bold'
                             : 'bg-transparent border-gray-900 text-gray-500 hover:text-gray-300'
                         }`}
                       >
-                        ⚡ Canlı Arbitraj (Read & Write)
-                        <span className="block text-[8px] text-gray-500 font-normal mt-0.5">Gerçek Alım/Satım</span>
+                        ⚡ Maker İşlem
+                        <span className="block text-[8px] text-gray-500 font-normal mt-0.5">Post-Only Emirler</span>
                       </button>
                     </div>
                     <p className="text-[9px] text-gray-500 leading-relaxed pt-1">
-                      {apiPermissionLevel === 'read_only' 
-                        ? '🛡️ Güvenli Mod Aktif: API anahtarı girseniz bile sistem işlem yapmaz. Sadece canlı piyasa hacmini takip eder ve cüzdanınızdaki rebate birikimlerini hesaplar.' 
-                        : '⚠️ Canlı İşlem Aktif: Girdiğiniz API anahtarının Alım-Satım (Spot Trading) yetkisinin açık olması gerekir. Para Çekme (Withdrawal) yetkisi kesinlikle KAPALI tutulmalıdır.'
+                      {apiPermissionLevel === 'read_only'
+                        ? '🛡️ Güvenli Mod: Sistem sadece bakiye kontrol eder. İşlem yapmaz.'
+                        : '⚡ Maker Mode Aktif: Sistem cüzdandaki varlık kadar Post-Only emirler gönderecek. Withdrawal asla yapılamaz (hard-locked).'
                       }
                     </p>
                   </div>
@@ -2491,11 +2456,11 @@ export default function App() {
                         <div key={exch.id} className="space-y-2 bg-black/40 border border-gray-900 p-3 rounded-lg">
                           <div className="flex justify-between items-center text-[10px] text-gray-300 font-bold">
                             <span className="uppercase text-emerald-400">{exch.name} API CONFIG</span>
-                            <span className="text-emerald-500 flex items-center gap-1 text-[9px] uppercase">
-                              <Check className="w-3 h-3" /> %100 Açık Kaynak API
+                            <span className={`text-emerald-500 flex items-center gap-1 text-[9px] uppercase ${keys.apiKey ? 'opacity-100' : 'opacity-40'}`}>
+                              <Check className="w-3 h-3" /> {keys.apiKey ? 'YAPILANDI' : 'YAPILMADI'}
                             </span>
                           </div>
-                          
+
                           <div className="space-y-2">
                             <div>
                               <label className="block text-[10px] text-gray-500 uppercase mb-1">API Key:</label>
@@ -2517,10 +2482,29 @@ export default function App() {
                                 placeholder={`${exch.name} Secret Key`}
                               />
                             </div>
+                            {exch.id === 'okx' && (
+                              <div>
+                                <label className="block text-[10px] text-gray-500 uppercase mb-1">Passphrase (OKX):</label>
+                                <input
+                                  type={apiKeysVisible ? "text" : "password"}
+                                  value={keys.passphrase || ''}
+                                  onChange={(e) => handleUpdateApiKey(exch.id, 'passphrase', e.target.value)}
+                                  className="w-full bg-black border border-gray-900 p-2 rounded text-gray-300 text-[11px] focus:border-emerald-500/40 outline-none"
+                                  placeholder="OKX Passphrase"
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+
+                  <div className="bg-red-950/20 border border-red-500/30 rounded-lg p-3 text-[9px] text-red-400 space-y-1 font-mono">
+                    <p className="font-bold">🔒 WITHDRAWAL HARD-LOCK (Backend Seviyesinde):</p>
+                    <p>✓ Para çekme fonksiyonu kod seviyesinde kapalıdır</p>
+                    <p>✓ Sistem asla wallet'tan dışarı para transfer edemez</p>
+                    <p>✓ Sadece Spot Trading (Buy/Sell) ve Balance Read yetkisi aktiftir</p>
                   </div>
                 </div>
 
